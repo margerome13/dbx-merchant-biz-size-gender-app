@@ -2,10 +2,10 @@ groups = [
     {
         "views": [
             {
-                "label": "DQ MDAR Masterfile Editor",
-                "help": "Pre-configured form editor for the DQ MDAR Inventory Masterfile table.",
-                "page": "views/dq_mdar_masterfile_editor.py",
-                "icon": ":material/folder_managed:",
+                "label": "Merchant Business Size Editor",
+                "help": "Form editor for the Merchant Business Size for Bank table.",
+                "page": "views/merchant_business_size_editor.py",
+                "icon": ":material/store:",
             },
         ],
     },

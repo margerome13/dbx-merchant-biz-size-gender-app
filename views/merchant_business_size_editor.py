@@ -5,210 +5,19 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config
 from typing import Dict, Any, List, Optional
 import json
-import re
-from datetime import datetime
-import pytz
 
-# Dropdown configuration - update these values as needed
-DROPDOWN_VALUES = {
-    "data_owner": [
-        "Beverly Dolor",
-        "Bert Lorica",
-        "Jose Yulo",
-        "Nitin Chawre",
-        "Pat Hipol",
-        "Javy Olives",
-        "Proletaryo Cabales",
-        "Camille Valmores",
-        "Leo Capote",
-        "Justin Dayrit",
-        "Mike Favila",
-        "Alvin Wong",
-        "Mel Valerio",
-        "Thai Dinh",
-        "Ma. Cecilia Jimlan",
-        "Michael Obaldo",
-        "Addison Pelayo",
-        "Bryan Judelle Ramos",
-        "Steven Michael Reyes",
-        "Abi Tabayoyong",
-        "Pranay Chukkala",
-        "Alvin Delagon",
-        "Patrick Hipol",
-        "Geraldine Veracion",
-        "Lance Cham",
-        "Donna Glaraga",
-    ],
-    
-    "tech_group": [
-        "DG",
-        "PE02",
-        "PE01",
-        "PE03",
-        "DE",
-        "PO - Javy",
-        "IDEA",
-        "ISS",
-        "EDS",
-        "CrPM",
-        "PO - Nitin",
-        "PO - Bert",
-        "PO - Cams",
-        "Ops",
-        "Fraud Analytics",
-    ],
-    
-    "overall_status": [
-        "Closed",
-        "Open",
-    ],
-    
-    "mdar_priority": [
-        "High",
-        "Low",
-        "Medium",
-    ],
-    
-    "root_cause_category": [
-        "Data Inconsistency",
-        "Source Issue",
-        "Ingestion",
-    ],
-    
-    "dq_poc": [
-        "Gibe",
-        "Roy",
-        "Lors",
-        "Rev",
-        "Mar",
-    ],
-    
-    "internal_domain": [
-        "Lending",
-        "Negosyo",
-        "Consumer",
-        "Transaction - Wallet",
-        "Merchant",
-        "Transaction - Bank",
-        "Treasury",
-        "Deposit",
-    ],
-    
-    "internal_subdomain": [
-        "Regulatory",
-        "CPM",
-        "BAU",
-        "IDEA",
-        "MDM",
-        "CrPM",
-        "CMS",
-        "Lending",
-        "FCI",
-        "Crypto",
-        "DS",
-        "Cypto",
-        "Escalated",
-        "Financial",
-        "Anomalo",
-        "Finance",
-    ],
-    
-    "mesh_team": [
-        "Consumer Lending",
-        "User Profiles",
-        "Accounts Management",
-        "Marketing Tech",
-        "Enterprise Products Core",
-        "Credit Infrastructure",
-        "Business Deposits",
-        "Cards Management",
-        "Core Payment Platforms",
-        "Partner Settlements",
-        "Business Lending",
-        "SKU Management",
-        "Partner Cash Solutions",
-        "Crypto",
-        "Transaction Assets",
-        "Salesforce",
-        "Identity and Access Management",
-        "Online Acceptance",
-        "Core Platform Lending",
-        "Open Loop Payment Channels",
-        "Consumer Deposits",
-        "Money Movement",
-        "DE",
-        "DG - MDM",
-        "ISS",
-        "EDG - DQ",
-        "IDEA",
-        "OPIC",
-        "SSAP",
-        "Self Top-up",
-        "InterBank Transfers",
-        "Risk Tech",
-        "DG - Metadata",
-        "Ops",
-        "CBS Platform",
-        "Business Manager",
-        "Developer Experience",
-        "Data Engineering",
-        "Tech Ops",
-        "Fraud",
-        "Base App - Mobile",
-        "E-Commerce",
-        "Account Assets",
-        "Closed Loop Payment Channels",
-    ],
-    
-    "timeline_year": [
-        "2026",
-        "2027",
-        "2028",
-    ],
-    
-    "timeline_month": [
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
-    ],
-    
-    "timeline_quarter": [
-        "Q1",
-        "Q2",
-        "Q3",
-        "Q4",
-    ],
-}
 
-# Fields that should use text_area for multi-line input
-MULTILINE_FIELDS = [
-    "updates",
-    "resolution_updates",
-    "notes",
-    "comments",
-    "description",
-    "details",
-]
 
-st.header(body="DQ MDAR Inventory Masterfile", divider=True)
+st.header(body="Merchant Business Size for Bank", divider=True)
 st.subheader("Form-based Table Editor")
 st.write(
-    "Manage records in the **dg_prod.sandbox.dq_mdar_inventory_masterfile** table using this user-friendly form interface."
+    "Manage records in the **dg_dev.sandbox.out_merchant_business_size_for_bank** table using this user-friendly form interface."
 )
 
 # Pre-configured connection details
 DATABRICKS_HOST = "dbc-7d305f7c-9def.cloud.databricks.com"
 HTTP_PATH = "/sql/1.0/warehouses/80e5636f05f63c9b"
-TABLE_NAME = "dg_prod.sandbox.dq_mdar_inventory_masterfile"
+TABLE_NAME = "dg_dev.sandbox.out_merchant_business_size_for_bank"
 
 # Initialize session state
 if 'selected_record' not in st.session_state:
@@ -238,67 +47,15 @@ def get_table_schema(table_name: str, conn) -> Dict[str, str]:
         schema_info = cursor.fetchall()
         return {row[0]: row[1] for row in schema_info}
 
-def get_manila_timestamp() -> str:
-    """Get current timestamp in Manila timezone"""
-    manila_tz = pytz.timezone('Asia/Manila')
-    manila_time = datetime.now(manila_tz)
-    return manila_time.strftime('%Y-%m-%d %H:%M:%S')
-
-def validate_ticket_format(ticket: str) -> bool:
-    """Validate ticket follows MDAR-#### format"""
-    if not ticket or not isinstance(ticket, str):
-        return False
-    ticket = ticket.strip()
-    return bool(re.match(r'^MDAR-\d+$', ticket))
-
-def check_ticket_exists(ticket: str, table_data: pd.DataFrame) -> bool:
-    """Check if ticket already exists in the table"""
-    if table_data is None or len(table_data) == 0:
-        return False
-    
-    # Check if 'ticket' column exists
-    if 'ticket' not in table_data.columns:
-        return False
-    
-    # Check if the ticket exists (case-insensitive)
-    ticket = ticket.strip().upper()
-    existing_tickets = table_data['ticket'].astype(str).str.strip().str.upper()
-    return ticket in existing_tickets.values
-
 def validate_new_record(record_data: Dict[str, Any]) -> tuple[bool, str]:
     """
     Validate new record data.
     Returns: (is_valid, error_message)
     """
-    # Define optional fields (including auto-generated timestamp fields)
-    optional_fields = ['root_cause', 'timeline_year', 'timeline_month', 'timeline_quarter', 'created_pht', 'updated_pht']
-    
-    # Check mandatory fields
+    # Check for empty required fields
     for field, value in record_data.items():
-        if field not in optional_fields:
-            # Check if field is empty or placeholder
-            if value is None or \
-               (isinstance(value, str) and (value.strip() == "" or value == "-- Select --")):
-                return False, f"Field '{field}' is mandatory and cannot be empty."
-    
-    # Check timeline conditional logic
-    timeline_year = record_data.get('timeline_year', '')
-    timeline_month = record_data.get('timeline_month', '')
-    timeline_quarter = record_data.get('timeline_quarter', '')
-    
-    # Clean up placeholder values
-    if timeline_year == "-- Select --":
-        timeline_year = ""
-    if timeline_month == "-- Select --":
-        timeline_month = ""
-    if timeline_quarter == "-- Select --":
-        timeline_quarter = ""
-    
-    # If timeline_year is filled, then month or quarter must be filled
-    if timeline_year and isinstance(timeline_year, str) and timeline_year.strip():
-        if (not timeline_month or (isinstance(timeline_month, str) and not timeline_month.strip())) and \
-           (not timeline_quarter or (isinstance(timeline_quarter, str) and not timeline_quarter.strip())):
-            return False, "If 'timeline_year' is provided, either 'timeline_month' or 'timeline_quarter' must be filled."
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return False, f"Field '{field}' cannot be empty."
     
     return True, ""
 
@@ -315,17 +72,6 @@ def insert_record(table_name: str, record_data: Dict[str, Any], conn):
     for key, value in record_data.items():
         if value == "-- Select --":
             record_data[key] = ""
-    
-    # Add timestamps for Manila timezone
-    manila_timestamp = get_manila_timestamp()
-    record_data['created_pht'] = manila_timestamp
-    record_data['updated_pht'] = manila_timestamp
-    
-    # Validate and clean ticket field
-    if 'ticket' in record_data:
-        record_data['ticket'] = record_data['ticket'].strip()
-        if not validate_ticket_format(record_data['ticket']):
-            raise ValueError(f"Invalid ticket format: '{record_data['ticket']}'. Must follow pattern MDAR-#### (e.g., MDAR-1234)")
     
     columns = list(record_data.keys())
     values = []
@@ -348,22 +94,9 @@ def insert_record(table_name: str, record_data: Dict[str, Any], conn):
 
 def update_record(table_name: str, record_data: Dict[str, Any], where_clause: str, conn):
     """Update an existing record"""
-    # Update the updated_pht timestamp to current Manila time
-    record_data['updated_pht'] = get_manila_timestamp()
-    
-    # Validate and clean ticket field
-    if 'ticket' in record_data:
-        record_data['ticket'] = record_data['ticket'].strip()
-        if not validate_ticket_format(record_data['ticket']):
-            raise ValueError(f"Invalid ticket format: '{record_data['ticket']}'. Must follow pattern MDAR-#### (e.g., MDAR-1234)")
-    
     set_clauses = []
     
     for col, val in record_data.items():
-        # Don't update created_pht - it should remain unchanged
-        if col == 'created_pht':
-            continue
-            
         if val is None or val == "":
             set_clauses.append(f"{col} = NULL")
         elif isinstance(val, str):
@@ -394,76 +127,6 @@ def render_form_field(column_name: str, column_type: str, current_value: Any = N
         current_value = ""
     
     field_key = f"{column_name}_{key_suffix}" if key_suffix else column_name
-    
-    # Special handling for timestamp fields - make them read-only and auto-populated
-    if column_name.lower() in ['created_pht', 'updated_pht']:
-        # For new records, show placeholder
-        if key_suffix == "add":
-            display_value = "(Auto-generated on save)"
-        else:
-            display_value = str(current_value) if current_value else "(Not set)"
-        
-        st.text_input(
-            f"{column_name} ({column_type})",
-            value=display_value,
-            disabled=True,
-            help="Automatically set to Manila time (PHT)",
-            key=field_key
-        )
-        return current_value  # Return original value, not the display value
-    
-    # Special handling for ticket field - enforce MDAR-#### pattern
-    if column_name.lower() == "ticket":
-        ticket_value = st.text_input(
-            f"{column_name} ({column_type})",
-            value=str(current_value).strip() if current_value != "" and current_value is not None else "",
-            max_chars=20,
-            help="Format: MDAR-#### (e.g., MDAR-1234)",
-            key=field_key
-        )
-        # Validate the ticket format
-        if ticket_value and not re.match(r'^MDAR-\d+$', ticket_value.strip()):
-            st.warning("⚠️ Ticket must follow format: MDAR-#### (e.g., MDAR-1234)")
-        return ticket_value.strip()  # Always strip trailing spaces
-    
-    # Check if this field should be a dropdown
-    if column_name in DROPDOWN_VALUES:
-        options = DROPDOWN_VALUES[column_name]
-        
-        # For new records (key_suffix="add"), add a blank placeholder
-        if key_suffix == "add":
-            options_with_placeholder = ["-- Select --"] + options
-            # Find the index of current value
-            try:
-                if current_value and current_value != "":
-                    default_index = options_with_placeholder.index(str(current_value))
-                else:
-                    default_index = 0  # Default to placeholder
-            except (ValueError, AttributeError):
-                default_index = 0
-            
-            return st.selectbox(
-                f"{column_name} ({column_type})",
-                options=options_with_placeholder,
-                index=default_index,
-                key=field_key
-            )
-        else:
-            # For editing existing records, use original options
-            try:
-                if current_value and current_value != "":
-                    default_index = options.index(str(current_value))
-                else:
-                    default_index = 0
-            except (ValueError, AttributeError):
-                default_index = 0
-            
-            return st.selectbox(
-                f"{column_name} ({column_type})",
-                options=options,
-                index=default_index,
-                key=field_key
-            )
     
     # Convert column type to appropriate Streamlit input
     if "int" in column_type.lower() or "bigint" in column_type.lower():
@@ -511,21 +174,11 @@ def render_form_field(column_name: str, column_type: str, current_value: Any = N
             key=field_key
         )
     else:  # Default to text input for strings and other types
-        # Check if this field should use text_area for multi-line input
-        if column_name.lower() in [field.lower() for field in MULTILINE_FIELDS]:
-            return st.text_area(
-                f"{column_name} ({column_type})",
-                value=str(current_value) if current_value != "" and current_value is not None else "",
-                height=150,
-                help="Supports multi-line text with line breaks and paragraphs",
-                key=field_key
-            )
-        else:
-            return st.text_input(
-                f"{column_name} ({column_type})",
-                value=str(current_value) if current_value != "" and current_value is not None else "",
-                key=field_key
-            )
+        return st.text_input(
+            f"{column_name} ({column_type})",
+            value=str(current_value) if current_value != "" and current_value is not None else "",
+            key=field_key
+        )
 
 # Main interface
 tab_form, tab_view = st.tabs(["**Form Editor**", "**Table View**"])
@@ -649,8 +302,7 @@ with tab_form:
             st.subheader("➕ Add New Record")
             
             # Show mandatory field info
-            st.info("ℹ️ **Mandatory fields:** All fields except root_cause, timeline_year, timeline_month, and timeline_quarter.\n\n"
-                   "**Note:** If timeline_year is filled, then either timeline_month or timeline_quarter must be provided.")
+            st.info("ℹ️ **Note:** All fields are required unless the table schema specifies otherwise.")
             
             with st.form("add_record_form"):
                 form_data = {}
@@ -671,25 +323,20 @@ with tab_form:
                     clear_form = st.form_submit_button("🗑️ Clear Form")
                 
                 if add_record_btn:
-                    # Check if ticket already exists
-                    ticket_value = form_data.get('ticket', '').strip()
-                    if check_ticket_exists(ticket_value, st.session_state.table_data):
-                        st.error("❌ Ticket already exists. Please add a new one or go to View/Edit to update details.")
+                    # Validate the record
+                    is_valid, error_msg = validate_new_record(form_data)
+                    
+                    if not is_valid:
+                        st.error(f"❌ Validation Error: {error_msg}")
                     else:
-                        # Validate the record
-                        is_valid, error_msg = validate_new_record(form_data)
-                        
-                        if not is_valid:
-                            st.error(f"❌ Validation Error: {error_msg}")
-                        else:
-                            try:
-                                conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
-                                insert_record(TABLE_NAME, form_data, conn)
-                                st.success("✅ Record added successfully!")
-                                st.session_state.table_data = None  # Force refresh
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Error adding record: {str(e)}")
+                        try:
+                            conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+                            insert_record(TABLE_NAME, form_data, conn)
+                            st.success("✅ Record added successfully!")
+                            st.session_state.table_data = None  # Force refresh
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error adding record: {str(e)}")
         
         elif action == "Delete Record":
             st.subheader("🗑️ Delete Record")
