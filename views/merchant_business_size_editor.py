@@ -8,16 +8,20 @@ import json
 
 
 
-st.header(body="Merchant Business Size for Bank", divider=True)
-st.subheader("Form-based Table Editor")
+st.header(body="Merchant Business Size and Gender Review", divider=True)
+st.subheader("Review and Update Merchant Data")
 st.write(
-    "Manage records in the **dg_dev.sandbox.out_merchant_business_size_for_bank** table using this user-friendly form interface."
+    "Review merchant records and provide **business_reviewed_size** (MICRO, SMALL, MEDIUM, LARGE) and **business_reviewed_gender** (MALE, FEMALE) for the **dg_dev.sandbox.out_merchant_business_size_for_bank** table."
 )
 
 # Pre-configured connection details
 DATABRICKS_HOST = "dbc-7d305f7c-9def.cloud.databricks.com"
 HTTP_PATH = "/sql/1.0/warehouses/80e5636f05f63c9b"
 TABLE_NAME = "dg_dev.sandbox.out_merchant_business_size_for_bank"
+
+# Dropdown values for review fields
+BUSINESS_SIZE_OPTIONS = ["", "MICRO", "SMALL", "MEDIUM", "LARGE"]
+GENDER_OPTIONS = ["", "MALE", "FEMALE"]
 
 # Initialize session state
 if 'selected_record' not in st.session_state:
@@ -128,6 +132,34 @@ def render_form_field(column_name: str, column_type: str, current_value: Any = N
     
     field_key = f"{column_name}_{key_suffix}" if key_suffix else column_name
     
+    # Special handling for review fields with dropdowns
+    if column_name == "business_reviewed_size":
+        current_str = str(current_value) if current_value != "" and current_value is not None else ""
+        try:
+            default_index = BUSINESS_SIZE_OPTIONS.index(current_str) if current_str in BUSINESS_SIZE_OPTIONS else 0
+        except ValueError:
+            default_index = 0
+        return st.selectbox(
+            f"{column_name} ({column_type})",
+            options=BUSINESS_SIZE_OPTIONS,
+            index=default_index,
+            key=field_key,
+            help="Select business size: MICRO, SMALL, MEDIUM, or LARGE"
+        )
+    elif column_name == "business_reviewed_gender":
+        current_str = str(current_value) if current_value != "" and current_value is not None else ""
+        try:
+            default_index = GENDER_OPTIONS.index(current_str) if current_str in GENDER_OPTIONS else 0
+        except ValueError:
+            default_index = 0
+        return st.selectbox(
+            f"{column_name} ({column_type})",
+            options=GENDER_OPTIONS,
+            index=default_index,
+            key=field_key,
+            help="Select gender: MALE or FEMALE"
+        )
+    
     # Convert column type to appropriate Streamlit input
     if "int" in column_type.lower() or "bigint" in column_type.lower():
         try:
@@ -217,18 +249,11 @@ with tab_form:
             except Exception as e:
                 st.error(f"❌ Refresh failed: {str(e)}")
         
-        # Action selection
-        action = st.radio(
-            "Select Action:",
-            ["View/Edit Record", "Add New Record", "Delete Record"],
-            horizontal=True
-        )
+        # Edit Record Section (removed action selection)
+        st.subheader("📝 Review and Update Record")
         
-        if action == "View/Edit Record":
-            st.subheader("📝 Edit Existing Record")
-            
-            # Record selection
-            if len(st.session_state.table_data) > 0:
+        # Record selection
+        if len(st.session_state.table_data) > 0:
                 # Create more readable record options with a placeholder
                 record_options = ["-- Select a record to edit --"]
                 for i, row in st.session_state.table_data.iterrows():
@@ -295,101 +320,10 @@ with tab_form:
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Error updating record: {str(e)}")
-            else:
-                st.info("No records found in the table.")
-        
-        elif action == "Add New Record":
-            st.subheader("➕ Add New Record")
-            
-            # Show mandatory field info
-            st.info("ℹ️ **Note:** All fields are required unless the table schema specifies otherwise.")
-            
-            with st.form("add_record_form"):
-                form_data = {}
-                
-                # Create form fields in columns for better layout
-                cols = st.columns(2)
-                col_idx = 0
-                
-                for column, dtype in st.session_state.table_schema.items():
-                    with cols[col_idx % 2]:
-                        form_data[column] = render_form_field(column, dtype, key_suffix="add")
-                    col_idx += 1
-                
-                col_add, col_clear = st.columns(2)
-                with col_add:
-                    add_record_btn = st.form_submit_button("➕ Add Record", type="primary")
-                with col_clear:
-                    clear_form = st.form_submit_button("🗑️ Clear Form")
-                
-                if add_record_btn:
-                    # Validate the record
-                    is_valid, error_msg = validate_new_record(form_data)
-                    
-                    if not is_valid:
-                        st.error(f"❌ Validation Error: {error_msg}")
-                    else:
-                        try:
-                            conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
-                            insert_record(TABLE_NAME, form_data, conn)
-                            st.success("✅ Record added successfully!")
-                            st.session_state.table_data = None  # Force refresh
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error adding record: {str(e)}")
-        
-        elif action == "Delete Record":
-            st.subheader("🗑️ Delete Record")
-            st.warning("⚠️ This action cannot be undone!")
-            
-            if len(st.session_state.table_data) > 0:
-                # Create more readable record options with a placeholder
-                record_options = ["-- Select a record to delete --"]
-                for i, row in st.session_state.table_data.iterrows():
-                    display_cols = []
-                    for col, val in row.items():
-                        if pd.notna(val) and val != "" and len(display_cols) < 3:
-                            display_cols.append(f"{col}={val}")
-                    record_display = f"Row {i}: {' | '.join(display_cols)}"
-                    record_options.append(record_display)
-                
-                selected_option = st.selectbox(
-                    "Select record to delete:",
-                    range(len(record_options)),
-                    format_func=lambda x: record_options[x],
-                    index=0
-                )
-                
-                # Only show delete confirmation if a valid record is selected (not the placeholder)
-                if selected_option > 0:
-                    selected_idx = selected_option - 1  # Adjust for placeholder
-                    selected_record = st.session_state.table_data.iloc[selected_idx]
-                    
-                    st.write("**Record to Delete:**")
-                    st.json(selected_record.to_dict())
-                    
-                    if st.button("🗑️ Confirm Delete", type="secondary"):
-                        try:
-                            conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
-                            # Create WHERE clause using first column as identifier
-                            first_col = list(st.session_state.table_schema.keys())[0]
-                            first_val = selected_record[first_col]
-                            if isinstance(first_val, str):
-                                escaped_val = first_val.replace("'", "''")
-                                where_clause = f"{first_col} = '{escaped_val}'"
-                            else:
-                                where_clause = f"{first_col} = {first_val}"
-                            
-                            delete_record(TABLE_NAME, where_clause, conn)
-                            st.success("✅ Record deleted successfully!")
-                            st.session_state.table_data = None  # Force refresh
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error deleting record: {str(e)}")
-            else:
-                st.info("No records found in the table.")
+        else:
+            st.info("No records found in the table.")
     else:
-        st.info("👆 Click 'Connect to Table' to start managing your data.")
+        st.info("👆 Click 'Connect to Table' to start reviewing merchant data.")
 
 with tab_view:
     st.subheader("📊 Table Data View")

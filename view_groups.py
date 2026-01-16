@@ -2,8 +2,8 @@ groups = [
     {
         "views": [
             {
-                "label": "Merchant Business Size Editor",
-                "help": "Form editor for the Merchant Business Size for Bank table.",
+                "label": "Merchant Business Size & Gender Review",
+                "help": "Review and update business size and gender for merchant records.",
                 "page": "views/merchant_business_size_editor.py",
                 "icon": ":material/store:",
             },
