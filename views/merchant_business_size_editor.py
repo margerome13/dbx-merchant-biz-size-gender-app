@@ -278,23 +278,47 @@ with tab_form:
                     selected_record = st.session_state.table_data.iloc[selected_idx]
                     
                     # Show current record in expandable section
-                    with st.expander("📋 Current Record Details", expanded=False):
-                        st.json(selected_record.to_dict())
+                    with st.expander("📋 Current Record Details", expanded=True):
+                        # Display all fields as read-only except the review fields
+                        for column, value in selected_record.items():
+                            if column not in ["business_reviewed_size", "business_reviewed_gender"]:
+                                st.text(f"{column}: {value}")
                     
-                    # Form for editing
+                    # Form for editing ONLY review fields
                     with st.form("edit_record_form"):
-                        st.write("**Edit Record:**")
+                        st.write("**Review Fields (Editable):**")
+                        st.info("ℹ️ Only business_reviewed_size and business_reviewed_gender can be edited.")
+                        
                         form_data = {}
                         
-                        # Create form fields in columns for better layout
-                        cols = st.columns(2)
-                        col_idx = 0
+                        # Copy all existing values
+                        for column in st.session_state.table_schema.keys():
+                            form_data[column] = selected_record.get(column, "")
                         
-                        for column, dtype in st.session_state.table_schema.items():
-                            with cols[col_idx % 2]:
-                                current_value = selected_record.get(column, "")
-                                form_data[column] = render_form_field(column, dtype, current_value, "edit")
-                            col_idx += 1
+                        # Create editable fields only for review columns
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            if "business_reviewed_size" in st.session_state.table_schema:
+                                current_value = selected_record.get("business_reviewed_size", "")
+                                dtype = st.session_state.table_schema["business_reviewed_size"]
+                                form_data["business_reviewed_size"] = render_form_field(
+                                    "business_reviewed_size", 
+                                    dtype, 
+                                    current_value, 
+                                    "edit"
+                                )
+                        
+                        with col2:
+                            if "business_reviewed_gender" in st.session_state.table_schema:
+                                current_value = selected_record.get("business_reviewed_gender", "")
+                                dtype = st.session_state.table_schema["business_reviewed_gender"]
+                                form_data["business_reviewed_gender"] = render_form_field(
+                                    "business_reviewed_gender", 
+                                    dtype, 
+                                    current_value, 
+                                    "edit"
+                                )
                         
                         col_save, col_cancel = st.columns(2)
                         with col_save:
@@ -314,7 +338,13 @@ with tab_form:
                                 else:
                                     where_clause = f"{first_col} = {first_val}"
                                 
-                                update_record(TABLE_NAME, form_data, where_clause, conn)
+                                # Only update the review fields
+                                update_data = {
+                                    "business_reviewed_size": form_data.get("business_reviewed_size", ""),
+                                    "business_reviewed_gender": form_data.get("business_reviewed_gender", "")
+                                }
+                                
+                                update_record(TABLE_NAME, update_data, where_clause, conn)
                                 st.success("✅ Record updated successfully!")
                                 st.session_state.table_data = None  # Force refresh
                                 st.rerun()
@@ -326,7 +356,7 @@ with tab_form:
         st.info("👆 Click 'Connect to Table' to start reviewing merchant data.")
 
 with tab_view:
-    st.subheader("📊 Table Data View")
+    st.subheader("📊 Table Data View with Inline Editing")
     
     if st.session_state.table_data is not None:
         # Search functionality
@@ -343,11 +373,85 @@ with tab_view:
             display_data = display_data[mask]
             st.info(f"Found {len(display_data)} records matching '{search_term}'")
         
-        st.dataframe(
+        st.info("ℹ️ **Inline Editing:** You can edit business_reviewed_size and business_reviewed_gender directly in the table below. Click 'Save Changes' when done.")
+        
+        # Configure column settings - make only review fields editable
+        column_config = {}
+        for col in display_data.columns:
+            if col == "business_reviewed_size":
+                column_config[col] = st.column_config.SelectboxColumn(
+                    "Business Reviewed Size",
+                    help="Select business size",
+                    options=["", "MICRO", "SMALL", "MEDIUM", "LARGE"],
+                    required=False
+                )
+            elif col == "business_reviewed_gender":
+                column_config[col] = st.column_config.SelectboxColumn(
+                    "Business Reviewed Gender",
+                    help="Select gender",
+                    options=["", "MALE", "FEMALE"],
+                    required=False
+                )
+            else:
+                # Make all other columns read-only
+                column_config[col] = st.column_config.Column(
+                    col,
+                    disabled=True
+                )
+        
+        # Use data_editor for inline editing
+        edited_data = st.data_editor(
             display_data,
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            column_config=column_config,
+            num_rows="fixed",
+            key="data_editor"
         )
+        
+        # Save changes button
+        if st.button("💾 Save All Changes", type="primary"):
+            try:
+                conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+                
+                # Find rows that were modified
+                changes_made = False
+                for idx in display_data.index:
+                    original_row = display_data.loc[idx]
+                    edited_row = edited_data.loc[idx]
+                    
+                    # Check if review fields changed
+                    size_changed = original_row.get("business_reviewed_size") != edited_row.get("business_reviewed_size")
+                    gender_changed = original_row.get("business_reviewed_gender") != edited_row.get("business_reviewed_gender")
+                    
+                    if size_changed or gender_changed:
+                        # Create WHERE clause using first column as identifier
+                        first_col = list(st.session_state.table_schema.keys())[0]
+                        first_val = original_row[first_col]
+                        if isinstance(first_val, str):
+                            escaped_val = first_val.replace("'", "''")
+                            where_clause = f"{first_col} = '{escaped_val}'"
+                        else:
+                            where_clause = f"{first_col} = {first_val}"
+                        
+                        # Update only the review fields
+                        update_data = {
+                            "business_reviewed_size": edited_row.get("business_reviewed_size", ""),
+                            "business_reviewed_gender": edited_row.get("business_reviewed_gender", "")
+                        }
+                        
+                        update_record(TABLE_NAME, update_data, where_clause, conn)
+                        changes_made = True
+                
+                if changes_made:
+                    st.success("✅ All changes saved successfully!")
+                    st.session_state.table_data = None  # Force refresh
+                    st.rerun()
+                else:
+                    st.info("ℹ️ No changes detected.")
+                    
+            except Exception as e:
+                st.error(f"❌ Error saving changes: {str(e)}")
         
         # Table statistics
         col1, col2, col3, col4 = st.columns(4)
