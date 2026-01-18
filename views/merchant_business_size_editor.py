@@ -5,6 +5,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config
 from typing import Dict, Any, List, Optional
 import json
+from datetime import datetime
+import pytz
 
 
 
@@ -13,6 +15,10 @@ st.subheader("Review and Update Merchant Data")
 st.write(
     "Review merchant records and provide **business_reviewed_size** (MICRO, SMALL, MEDIUM, LARGE) and **business_reviewed_gender** (MALE, FEMALE)."
 )
+
+# Display current user
+current_user = get_current_user_email()
+st.info(f"👤 **Logged in as:** {current_user}")
 
 # Pre-configured connection details
 DATABRICKS_HOST = "dbc-7d305f7c-9def.cloud.databricks.com"
@@ -52,6 +58,23 @@ def get_connection(server_hostname: str, http_path: str):
         http_path=http_path,
         credentials_provider=lambda: Config().authenticate,
     )
+
+@st.cache_data(ttl="1h")
+def get_current_user_email() -> str:
+    """Get the current user's Databricks email"""
+    try:
+        w = WorkspaceClient()
+        current_user = w.current_user.me()
+        return current_user.user_name
+    except Exception as e:
+        st.warning(f"Could not retrieve user email: {str(e)}")
+        return "unknown@databricks.com"
+
+def get_manila_timestamp() -> str:
+    """Get current timestamp in Manila timezone"""
+    manila_tz = pytz.timezone('Asia/Manila')
+    manila_time = datetime.now(manila_tz)
+    return manila_time.strftime('%Y-%m-%d %H:%M:%S')
 
 def get_table_schema(table_name: str, conn) -> Dict[str, str]:
     """Get table schema information"""
@@ -366,11 +389,18 @@ with tab_form:
                                 else:
                                     where_clause = f"{first_col} = {first_val}"
                                 
-                                # Only update the review fields
+                                # Prepare update data with auto-generated fields
                                 update_data = {
                                     "business_reviewed_size": form_data.get("business_reviewed_size", ""),
                                     "business_reviewed_gender": form_data.get("business_reviewed_gender", "")
                                 }
+                                
+                                # Add auto-generated fields if they exist in schema
+                                if "reviewed_by" in st.session_state.table_schema:
+                                    update_data["reviewed_by"] = get_current_user_email()
+                                
+                                if "business_reviewed_date" in st.session_state.table_schema:
+                                    update_data["business_reviewed_date"] = get_manila_timestamp()
                                 
                                 update_record(TABLE_NAME, update_data, where_clause, conn)
                                 st.success("✅ Record updated successfully!")
@@ -448,6 +478,10 @@ with tab_view:
             try:
                 conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
                 
+                # Get auto-generated values once
+                user_email = get_current_user_email()
+                manila_timestamp = get_manila_timestamp()
+                
                 # Find rows that were modified
                 changes_made = False
                 for idx in display_data.index:
@@ -468,11 +502,18 @@ with tab_view:
                         else:
                             where_clause = f"{first_col} = {first_val}"
                         
-                        # Update only the review fields
+                        # Prepare update data with review fields
                         update_data = {
                             "business_reviewed_size": edited_row.get("business_reviewed_size", ""),
                             "business_reviewed_gender": edited_row.get("business_reviewed_gender", "")
                         }
+                        
+                        # Add auto-generated fields if they exist in schema
+                        if "reviewed_by" in st.session_state.table_schema:
+                            update_data["reviewed_by"] = user_email
+                        
+                        if "business_reviewed_date" in st.session_state.table_schema:
+                            update_data["business_reviewed_date"] = manila_timestamp
                         
                         update_record(TABLE_NAME, update_data, where_clause, conn)
                         changes_made = True
