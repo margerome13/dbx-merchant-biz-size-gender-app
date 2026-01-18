@@ -8,18 +8,6 @@ import json
 from datetime import datetime
 import pytz
 
-
-
-st.header(body="Merchant Business Size and Gender Review", divider=True)
-st.subheader("Review and Update Merchant Data")
-st.write(
-    "Review merchant records and provide **business_reviewed_size** (MICRO, SMALL, MEDIUM, LARGE) and **business_reviewed_gender** (MALE, FEMALE)."
-)
-
-# Display current user
-current_user = get_current_user_email()
-st.info(f"👤 **Logged in as:** {current_user}")
-
 # Pre-configured connection details
 DATABRICKS_HOST = "dbc-7d305f7c-9def.cloud.databricks.com"
 HTTP_PATH = "/sql/1.0/warehouses/80e5636f05f63c9b"
@@ -75,6 +63,17 @@ def get_manila_timestamp() -> str:
     manila_tz = pytz.timezone('Asia/Manila')
     manila_time = datetime.now(manila_tz)
     return manila_time.strftime('%Y-%m-%d %H:%M:%S')
+
+# Page header and user info
+st.header(body="Merchant Business Size and Gender Review", divider=True)
+st.subheader("Review and Update Merchant Data")
+st.write(
+    "Review merchant records and provide **business_reviewed_size** (MICRO, SMALL, MEDIUM, LARGE) and **business_reviewed_gender** (MALE, FEMALE)."
+)
+
+# Display current user
+current_user = get_current_user_email()
+st.info(f"👤 **Logged in as:** {current_user}")
 
 def get_table_schema(table_name: str, conn) -> Dict[str, str]:
     """Get table schema information"""
