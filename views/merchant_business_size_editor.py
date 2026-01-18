@@ -11,13 +11,18 @@ import json
 st.header(body="Merchant Business Size and Gender Review", divider=True)
 st.subheader("Review and Update Merchant Data")
 st.write(
-    "Review merchant records and provide **business_reviewed_size** (MICRO, SMALL, MEDIUM, LARGE) and **business_reviewed_gender** (MALE, FEMALE) for the **dg_dev.sandbox.out_merchant_business_size_for_bank** table."
+    "Review merchant records and provide **business_reviewed_size** (MICRO, SMALL, MEDIUM, LARGE) and **business_reviewed_gender** (MALE, FEMALE)."
 )
 
 # Pre-configured connection details
 DATABRICKS_HOST = "dbc-7d305f7c-9def.cloud.databricks.com"
 HTTP_PATH = "/sql/1.0/warehouses/80e5636f05f63c9b"
-TABLE_NAME = "dg_dev.sandbox.out_merchant_business_size_for_bank"
+
+# Available tables
+AVAILABLE_TABLES = {
+    "Dev - Merchant Business Size": "dg_dev.sandbox.out_merchant_business_size_for_bank",
+    "Prod Test - Merchant Business Size": "dg_prod.sandbox.out_merchant_business_size_for_bank_test"
+}
 
 # Dropdown values for review fields
 BUSINESS_SIZE_OPTIONS = ["", "MICRO", "SMALL", "MEDIUM", "LARGE"]
@@ -34,6 +39,10 @@ if 'table_schema' not in st.session_state:
     st.session_state.table_schema = None
 if 'connection_established' not in st.session_state:
     st.session_state.connection_established = False
+if 'selected_table' not in st.session_state:
+    st.session_state.selected_table = list(AVAILABLE_TABLES.keys())[0]
+if 'current_table_name' not in st.session_state:
+    st.session_state.current_table_name = AVAILABLE_TABLES[list(AVAILABLE_TABLES.keys())[0]]
 
 @st.cache_resource(ttl="1h")
 def get_connection(server_hostname: str, http_path: str):
@@ -216,6 +225,25 @@ def render_form_field(column_name: str, column_type: str, current_value: Any = N
 tab_form, tab_view = st.tabs(["**Form Editor**", "**Table View**"])
 
 with tab_form:
+    # Table selector
+    st.write("### Select Table")
+    selected_table_name = st.selectbox(
+        "Choose a table to review:",
+        options=list(AVAILABLE_TABLES.keys()),
+        index=list(AVAILABLE_TABLES.keys()).index(st.session_state.selected_table),
+        key="table_selector"
+    )
+    
+    # Update selected table if changed
+    if selected_table_name != st.session_state.selected_table:
+        st.session_state.selected_table = selected_table_name
+        st.session_state.current_table_name = AVAILABLE_TABLES[selected_table_name]
+        st.session_state.connection_established = False
+        st.session_state.table_data = None
+        st.session_state.table_schema = None
+    
+    TABLE_NAME = st.session_state.current_table_name
+    
     # Connection info display
     st.info(f"🔗 **Connection Details:**\n- Host: `{DATABRICKS_HOST}`\n- Warehouse: `{HTTP_PATH}`\n- Table: `{TABLE_NAME}`")
     
@@ -359,6 +387,12 @@ with tab_view:
     st.subheader("📊 Table Data View with Inline Editing")
     
     if st.session_state.table_data is not None:
+        # Get current table name
+        TABLE_NAME = st.session_state.current_table_name
+        
+        # Display current table info
+        st.info(f"📋 **Current Table:** `{TABLE_NAME}`")
+        
         # Search functionality
         search_term = st.text_input("🔍 Search records:", placeholder="Enter search term...", key="search_table_view")
         
