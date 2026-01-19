@@ -47,47 +47,55 @@ def get_connection(server_hostname: str, http_path: str):
         credentials_provider=lambda: Config().authenticate,
     )
 
-@st.cache_data(ttl="1h")
 def get_current_user_email() -> str:
-    """Get the current user's Databricks email"""
+    """Get the current user's Databricks email - no caching to ensure fresh data"""
     try:
-        # Try to get user from Streamlit's experimental user info (for Databricks Apps)
-        if hasattr(st, 'experimental_user') and st.experimental_user:
-            user_email = st.experimental_user.get('email')
-            if user_email:
-                return user_email
-        
-        # Fallback: Try WorkspaceClient
-        w = WorkspaceClient()
-        current_user = w.current_user.me()
-        
-        # Check if we got a user_name (email) or just an ID
-        if current_user.user_name and '@' in current_user.user_name:
-            return current_user.user_name
-        
-        # If we only got an ID, try to get email from user details
-        if current_user.emails and len(current_user.emails) > 0:
-            return current_user.emails[0].value
-        
-        # Last resort: return the display name or ID
-        if current_user.display_name:
-            return current_user.display_name
-        
-        return str(current_user.id) if current_user.id else "unknown@databricks.com"
-        
-    except Exception as e:
-        # Try to get from SQL query as last resort
+        # Method 1: Try SQL query to get current user (most reliable in Databricks Apps)
         try:
             conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
             with conn.cursor() as cursor:
                 cursor.execute("SELECT current_user()")
                 result = cursor.fetchone()
                 if result and result[0]:
-                    return result[0]
-        except:
-            pass
+                    user_value = result[0]
+                    # If it's an email, return it
+                    if '@' in str(user_value):
+                        return str(user_value)
+        except Exception as sql_error:
+            st.warning(f"SQL method failed: {str(sql_error)}")
         
-        st.warning(f"Could not retrieve user email: {str(e)}")
+        # Method 2: Try Streamlit's experimental user info
+        if hasattr(st, 'experimental_user') and st.experimental_user:
+            user_email = st.experimental_user.get('email')
+            if user_email and '@' in user_email:
+                return user_email
+        
+        # Method 3: Try WorkspaceClient
+        w = WorkspaceClient()
+        current_user = w.current_user.me()
+        
+        # Check if we got a user_name (email)
+        if current_user.user_name and '@' in str(current_user.user_name):
+            return current_user.user_name
+        
+        # Try to get email from emails array
+        if hasattr(current_user, 'emails') and current_user.emails and len(current_user.emails) > 0:
+            email_value = current_user.emails[0].value
+            if email_value and '@' in email_value:
+                return email_value
+        
+        # Try display name
+        if hasattr(current_user, 'display_name') and current_user.display_name and '@' in current_user.display_name:
+            return current_user.display_name
+        
+        # If we only have an ID, show a warning and return it
+        user_id = str(current_user.id) if hasattr(current_user, 'id') and current_user.id else "unknown"
+        st.warning(f"⚠️ Could not retrieve email. Using user ID: {user_id}. Please contact your Databricks administrator.")
+        return user_id
+        
+    except Exception as e:
+        error_msg = f"Error retrieving user: {str(e)}"
+        st.error(error_msg)
         return "unknown@databricks.com"
 
 def get_manila_timestamp() -> str:
@@ -103,9 +111,12 @@ st.write(
     "Review merchant records and provide **business_reviewed_size** (MICRO, SMALL, MEDIUM, LARGE) and **business_reviewed_gender** (MALE, FEMALE)."
 )
 
-# Display current user
+# Display current user with debug info
 current_user = get_current_user_email()
-st.info(f"👤 **Logged in as:** {current_user}")
+if '@' in current_user:
+    st.info(f"👤 **Logged in as:** {current_user}")
+else:
+    st.warning(f"⚠️ **User ID (not email):** {current_user} - Records will be saved with this ID. Contact your admin to configure email access.")
 
 def get_table_schema(table_name: str, conn) -> Dict[str, str]:
     """Get table schema information"""
