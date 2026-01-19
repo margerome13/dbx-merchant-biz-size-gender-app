@@ -51,10 +51,42 @@ def get_connection(server_hostname: str, http_path: str):
 def get_current_user_email() -> str:
     """Get the current user's Databricks email"""
     try:
+        # Try to get user from Streamlit's experimental user info (for Databricks Apps)
+        if hasattr(st, 'experimental_user') and st.experimental_user:
+            user_email = st.experimental_user.get('email')
+            if user_email:
+                return user_email
+        
+        # Fallback: Try WorkspaceClient
         w = WorkspaceClient()
         current_user = w.current_user.me()
-        return current_user.user_name
+        
+        # Check if we got a user_name (email) or just an ID
+        if current_user.user_name and '@' in current_user.user_name:
+            return current_user.user_name
+        
+        # If we only got an ID, try to get email from user details
+        if current_user.emails and len(current_user.emails) > 0:
+            return current_user.emails[0].value
+        
+        # Last resort: return the display name or ID
+        if current_user.display_name:
+            return current_user.display_name
+        
+        return str(current_user.id) if current_user.id else "unknown@databricks.com"
+        
     except Exception as e:
+        # Try to get from SQL query as last resort
+        try:
+            conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT current_user()")
+                result = cursor.fetchone()
+                if result and result[0]:
+                    return result[0]
+        except:
+            pass
+        
         st.warning(f"Could not retrieve user email: {str(e)}")
         return "unknown@databricks.com"
 
