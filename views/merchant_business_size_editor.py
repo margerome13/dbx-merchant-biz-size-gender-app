@@ -20,7 +20,7 @@ HTTP_PATH = "/sql/1.0/warehouses/80e5636f05f63c9b"
 
 # Available tables
 AVAILABLE_TABLES = {
-    "Dev - Merchant Business Size": "dg_dev.sandbox.out_merchant_business_size_for_bank",
+    # "Dev - Merchant Business Size": "dg_dev.sandbox.out_merchant_business_size_for_bank",
     "Prod Test - Merchant Business Size": "dg_prod.sandbox.out_merchant_business_size_for_bank_test"
 }
 
