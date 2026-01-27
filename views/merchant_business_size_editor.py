@@ -419,11 +419,24 @@ if st.session_state.connection_established and st.session_state.table_data is no
             # Filter pending reviews
             pending_reviews = st.session_state.table_data[
                 st.session_state.table_data['review_status'] == STATUS_PENDING
-            ]
+            ].copy()  # Make a copy to avoid modifying original
             
             if len(pending_reviews) > 0:
                 st.info(f"📋 {len(pending_reviews)} pending review(s)")
                 st.write("**Inline Table Editor:** Review and edit values directly in the table, then Approve or Reject")
+                
+                # Pre-populate the final columns with pending values for editing
+                # This allows the checker to see and modify the maker's proposed values
+                if 'business_reviewed_size' in pending_reviews.columns:
+                    pending_reviews['business_reviewed_size'] = pending_reviews.apply(
+                        lambda row: row['business_reviewed_size'] if pd.notna(row['business_reviewed_size']) and row['business_reviewed_size'] != '' 
+                        else row['business_reviewed_size_pending'], axis=1
+                    )
+                if 'business_reviewed_gender' in pending_reviews.columns:
+                    pending_reviews['business_reviewed_gender'] = pending_reviews.apply(
+                        lambda row: row['business_reviewed_gender'] if pd.notna(row['business_reviewed_gender']) and row['business_reviewed_gender'] != '' 
+                        else row['business_reviewed_gender_pending'], axis=1
+                    )
                 
                 # Configure column settings for inline editing
                 column_config = {}
@@ -481,21 +494,23 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             approved_count = 0
                             
                             for idx in pending_reviews.index:
+                                original_row = pending_reviews.loc[idx]
                                 edited_row = edited_data.loc[idx]
                                 
-                                # Get edited values (copy from pending if not edited)
+                                # Get the final values to approve
+                                # Priority: 1) Checker's edits, 2) Maker's pending values
                                 size_val = edited_row.get("business_reviewed_size")
                                 gender_val = edited_row.get("business_reviewed_gender")
                                 
-                                # If not edited, use pending values
+                                # If checker didn't edit (columns are empty/null), use pending values
                                 if pd.isna(size_val) or size_val == "":
-                                    size_val = edited_row.get("business_reviewed_size_pending")
+                                    size_val = original_row.get("business_reviewed_size_pending")
                                 if pd.isna(gender_val) or gender_val == "":
-                                    gender_val = edited_row.get("business_reviewed_gender_pending")
+                                    gender_val = original_row.get("business_reviewed_gender_pending")
                                 
                                 # Create WHERE clause
                                 first_col = list(st.session_state.table_schema.keys())[0]
-                                first_val = edited_row[first_col]
+                                first_val = original_row[first_col]
                                 
                                 if isinstance(first_val, str):
                                     escaped_val = first_val.replace("'", "''")
