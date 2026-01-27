@@ -7,6 +7,12 @@ from typing import Dict, Any, List, Optional
 import json
 from datetime import datetime
 import pytz
+import sys
+import os
+
+# Add config directory to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from config.user_roles import get_user_role, is_admin, is_maker, is_checker
 
 # Pre-configured connection details
 DATABRICKS_HOST = "dbc-7d305f7c-9def.cloud.databricks.com"
@@ -193,23 +199,53 @@ def render_form_field(column_name: str, column_type: str, current_value: Any = N
 st.header(body="Merchant Business Size and Gender Review", divider=True)
 st.subheader("Maker-Checker Workflow")
 
-# Display current user
+# Display current user and determine role
 current_user = get_current_user_email()
+user_base_role = get_user_role(current_user)
+
+# Display user info with role
 if '@' in current_user:
-    st.info(f"👤 **Logged in as:** {current_user}")
+    if user_base_role == "UNAUTHORIZED":
+        st.error(f"🚫 **Access Denied:** {current_user} is not authorized to use this application.")
+        st.info("Please contact your administrator to request access.")
+        st.stop()
+    else:
+        col_user, col_role_badge = st.columns([3, 1])
+        with col_user:
+            st.info(f"👤 **Logged in as:** {current_user}")
+        with col_role_badge:
+            if user_base_role == "ADMIN":
+                st.success(f"🔑 **Role:** {user_base_role}")
+            elif user_base_role == "MAKER":
+                st.info(f"📝 **Role:** {user_base_role}")
+            elif user_base_role == "CHECKER":
+                st.warning(f"✅ **Role:** {user_base_role}")
 else:
     st.warning(f"⚠️ **User ID:** {current_user}")
+    user_base_role = "ADMIN"  # Fallback for development
 
-# Role selector
+# Role selector (only for admins)
 col_role, col_table = st.columns(2)
 with col_role:
-    user_role = st.selectbox(
-        "🎭 Select Your Role:",
-        options=["MAKER", "CHECKER"],
-        index=0 if st.session_state.user_role == "MAKER" else 1,
-        help="Makers submit reviews, Checkers approve/reject them"
-    )
-    st.session_state.user_role = user_role
+    if user_base_role == "ADMIN":
+        # Admins can switch roles
+        user_role = st.selectbox(
+            "🎭 Switch Role (Admin Only):",
+            options=["MAKER", "CHECKER"],
+            index=0 if st.session_state.user_role == "MAKER" else 1,
+            help="As an admin, you can switch between roles to test the workflow"
+        )
+        st.session_state.user_role = user_role
+    else:
+        # Non-admins see their assigned role (read-only)
+        st.session_state.user_role = user_base_role
+        st.text_input(
+            "🎭 Your Role:",
+            value=user_base_role,
+            disabled=True,
+            help="Your role is determined by your email address"
+        )
+        user_role = user_base_role
 
 with col_table:
     selected_table_name = st.selectbox(
