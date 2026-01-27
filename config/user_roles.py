@@ -17,14 +17,14 @@ ADMINS = [
 
 # Maker users - can submit reviews
 MAKERS = [
-    "revylen.asilo@paymaya.com",
-    "revylen.asilo@maya.ph",
+     ""
     # Add more maker emails here
 ]
 
 # Checker users - can approve/reject reviews
 CHECKERS = [
-    ""
+    "revylen.asilo@paymaya.com",
+    "revylen.asilo@maya.ph",
     # Add more checker emails here
 ]
 
