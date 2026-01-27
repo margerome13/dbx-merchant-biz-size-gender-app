@@ -55,9 +55,18 @@ def get_connection(server_hostname: str, http_path: str):
     )
 
 def get_current_user_email() -> str:
-    """Get the current user's Databricks email - no caching to ensure fresh data"""
+    """Get the current user's Databricks email from request headers"""
     try:
-        # Method 1: Try SQL query to get current user (most reliable in Databricks Apps)
+        # Method 1: Try to get from Streamlit request headers (Databricks Apps)
+        # This is the correct way for Databricks Apps with OBO enabled
+        if hasattr(st, 'context') and hasattr(st.context, 'headers'):
+            headers = st.context.headers
+            # X-Forwarded-Preferred-Username contains the actual user email
+            username = headers.get("X-Forwarded-Preferred-Username")
+            if username:
+                return username
+        
+        # Method 2: Try SQL query to get current user
         try:
             conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
             with conn.cursor() as cursor:
@@ -65,35 +74,22 @@ def get_current_user_email() -> str:
                 result = cursor.fetchone()
                 if result and result[0]:
                     user_value = result[0]
-                    # If it's an email, return it
                     if '@' in str(user_value):
                         return str(user_value)
-        except Exception as sql_error:
+        except Exception:
             pass
-        
-        # Method 2: Try Streamlit's experimental user info
-        if hasattr(st, 'experimental_user') and st.experimental_user:
-            user_email = st.experimental_user.get('email')
-            if user_email and '@' in user_email:
-                return user_email
         
         # Method 3: Try WorkspaceClient
         w = WorkspaceClient()
         current_user = w.current_user.me()
         
-        # Check if we got a user_name (email)
         if current_user.user_name and '@' in str(current_user.user_name):
             return current_user.user_name
         
-        # Try to get email from emails array
         if hasattr(current_user, 'emails') and current_user.emails and len(current_user.emails) > 0:
             email_value = current_user.emails[0].value
             if email_value and '@' in email_value:
                 return email_value
-        
-        # Try display name
-        if hasattr(current_user, 'display_name') and current_user.display_name and '@' in current_user.display_name:
-            return current_user.display_name
         
         # If we only have an ID, return it
         user_id = str(current_user.id) if hasattr(current_user, 'id') and current_user.id else "unknown"
