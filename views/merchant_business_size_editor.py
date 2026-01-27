@@ -18,9 +18,9 @@ AVAILABLE_TABLES = {
     "Prod Test - Merchant Business Size": "dg_prod.sandbox.out_merchant_business_size_for_bank_test"
 }
 
-# Dropdown values for review fields
-BUSINESS_SIZE_OPTIONS = ["", "MICRO", "SMALL", "MEDIUM", "LARGE"]
-GENDER_OPTIONS = ["", "MALE", "FEMALE"]
+# Dropdown values for review fields (no blank option)
+BUSINESS_SIZE_OPTIONS = ["MICRO", "SMALL", "MEDIUM", "LARGE"]
+GENDER_OPTIONS = ["MALE", "FEMALE"]
 
 # Workflow statuses
 STATUS_PENDING = "PENDING"
@@ -254,84 +254,83 @@ if st.session_state.connection_established and st.session_state.table_data is no
         tab_submit, tab_my_submissions = st.tabs(["Submit New Review", "My Submissions"])
         
         with tab_submit:
-            st.write("Select a record and fill in the business size and gender for review.")
+            st.write("**Inline Table Editor:** Edit business size and gender directly in the table, then click 'Submit for Approval'")
             
-            # Record selection
+            if st.button("🔄 Refresh Records", key="maker_refresh"):
+                st.session_state.table_data = None
+                st.rerun()
+            
             if len(st.session_state.table_data) > 0:
-                record_options = ["-- Select a record --"]
-                for i, row in st.session_state.table_data.iterrows():
-                    display_cols = []
-                    for col, val in row.items():
-                        if pd.notna(val) and val != "" and len(display_cols) < 3:
-                            display_cols.append(f"{col}={val}")
-                    record_display = f"Row {i}: {' | '.join(display_cols)}"
-                    record_options.append(record_display)
+                # Filter to show only records that are not pending or can be resubmitted
+                display_data = st.session_state.table_data.copy()
                 
-                selected_option = st.selectbox(
-                    "Select record:",
-                    range(len(record_options)),
-                    format_func=lambda x: record_options[x],
-                    index=0,
-                    key="maker_select"
+                # Configure column settings for inline editing
+                column_config = {}
+                for col in display_data.columns:
+                    if col == "business_reviewed_size_pending":
+                        column_config[col] = st.column_config.SelectboxColumn(
+                            "Business Size (Pending)",
+                            help="Select business size",
+                            options=BUSINESS_SIZE_OPTIONS,
+                            required=True
+                        )
+                    elif col == "business_reviewed_gender_pending":
+                        column_config[col] = st.column_config.SelectboxColumn(
+                            "Gender (Pending)",
+                            help="Select gender",
+                            options=GENDER_OPTIONS,
+                            required=True
+                        )
+                    elif col in ["review_status", "reviewed_by_maker", "reviewed_date_maker", 
+                               "reviewed_by_checker", "reviewed_date_checker", "checker_comments"]:
+                        # Show these columns but make them read-only
+                        column_config[col] = st.column_config.Column(
+                            col.replace("_", " ").title(),
+                            disabled=True
+                        )
+                    else:
+                        # Make all other columns read-only
+                        column_config[col] = st.column_config.Column(
+                            col,
+                            disabled=True
+                        )
+                
+                # Use data_editor for inline editing
+                edited_data = st.data_editor(
+                    display_data,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=column_config,
+                    num_rows="fixed",
+                    key="maker_data_editor"
                 )
                 
-                if selected_option > 0:
-                    selected_idx = selected_option - 1
-                    selected_record = st.session_state.table_data.iloc[selected_idx]
-                    
-                    # Show current record details
-                    with st.expander("📋 Record Details", expanded=True):
-                        for column, value in selected_record.items():
-                            if column not in ["business_reviewed_size_pending", "business_reviewed_gender_pending", 
-                                            "review_status", "reviewed_by_maker", "reviewed_date_maker",
-                                            "reviewed_by_checker", "reviewed_date_checker", "checker_comments"]:
-                                st.text(f"{column}: {value}")
-                    
-                    # Show current status
-                    current_status = selected_record.get("review_status", "")
-                    if current_status == STATUS_PENDING:
-                        st.warning("⏳ This record has a PENDING review")
-                    elif current_status == STATUS_APPROVED:
-                        st.success("✅ This record was APPROVED")
-                    elif current_status == STATUS_REJECTED:
-                        st.error("❌ This record was REJECTED")
-                        if pd.notna(selected_record.get("checker_comments")):
-                            st.info(f"💬 Checker comments: {selected_record.get('checker_comments')}")
-                    
-                    # Maker form
-                    with st.form("maker_form"):
-                        st.write("**Fill in Review Values:**")
+                # Submit button
+                if st.button("📤 Submit Selected Records for Approval", type="primary", key="maker_submit"):
+                    try:
+                        conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+                        submitted_count = 0
                         
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            current_val = selected_record.get("business_reviewed_size_pending", "")
-                            size_value = render_form_field(
-                                "business_reviewed_size_pending",
-                                "string",
-                                current_val,
-                                "maker"
-                            )
-                        
-                        with col2:
-                            current_val = selected_record.get("business_reviewed_gender_pending", "")
-                            gender_value = render_form_field(
-                                "business_reviewed_gender_pending",
-                                "string",
-                                current_val,
-                                "maker"
-                            )
-                        
-                        submit_btn = st.form_submit_button("📤 Submit for Approval", type="primary")
-                        
-                        if submit_btn:
-                            if not size_value or not gender_value:
-                                st.error("❌ Please fill in both business size and gender")
-                            else:
-                                try:
-                                    conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+                        for idx in display_data.index:
+                            original_row = display_data.loc[idx]
+                            edited_row = edited_data.loc[idx]
+                            
+                            # Check if review fields were filled or changed
+                            size_val = edited_row.get("business_reviewed_size_pending")
+                            gender_val = edited_row.get("business_reviewed_gender_pending")
+                            
+                            # Only submit if both fields are filled
+                            if pd.notna(size_val) and pd.notna(gender_val) and size_val != "" and gender_val != "":
+                                # Check if values changed or are new
+                                orig_size = original_row.get("business_reviewed_size_pending")
+                                orig_gender = original_row.get("business_reviewed_gender_pending")
+                                
+                                if (pd.isna(orig_size) or orig_size != size_val or 
+                                    pd.isna(orig_gender) or orig_gender != gender_val):
+                                    
+                                    # Create WHERE clause
                                     first_col = list(st.session_state.table_schema.keys())[0]
-                                    first_val = selected_record[first_col]
+                                    first_val = original_row[first_col]
                                     
                                     if isinstance(first_val, str):
                                         escaped_val = first_val.replace("'", "''")
@@ -340,19 +339,24 @@ if st.session_state.connection_established and st.session_state.table_data is no
                                         where_clause = f"{first_col} = {first_val}"
                                     
                                     update_data = {
-                                        "business_reviewed_size_pending": size_value,
-                                        "business_reviewed_gender_pending": gender_value,
+                                        "business_reviewed_size_pending": size_val,
+                                        "business_reviewed_gender_pending": gender_val,
                                         "review_status": STATUS_PENDING,
                                         "reviewed_by_maker": current_user,
                                         "reviewed_date_maker": get_manila_timestamp()
                                     }
                                     
                                     update_record(TABLE_NAME, update_data, where_clause, conn)
-                                    st.success("✅ Submitted for checker approval!")
-                                    st.session_state.table_data = None
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"❌ Error: {str(e)}")
+                                    submitted_count += 1
+                        
+                        if submitted_count > 0:
+                            st.success(f"✅ Submitted {submitted_count} record(s) for approval!")
+                            st.session_state.table_data = None
+                            st.rerun()
+                        else:
+                            st.info("ℹ️ No changes detected or no records with both fields filled.")
+                    except Exception as e:
+                        st.error(f"❌ Error: {str(e)}")
             else:
                 st.info("No records found")
         
@@ -408,7 +412,7 @@ if st.session_state.connection_established and st.session_state.table_data is no
         tab_pending, tab_all = st.tabs(["Pending Reviews", "All Reviews"])
         
         with tab_pending:
-            if st.button("🔄 Refresh Pending"):
+            if st.button("🔄 Refresh Pending", key="checker_refresh"):
                 st.session_state.table_data = None
                 st.rerun()
             
@@ -419,79 +423,119 @@ if st.session_state.connection_established and st.session_state.table_data is no
             
             if len(pending_reviews) > 0:
                 st.info(f"📋 {len(pending_reviews)} pending review(s)")
+                st.write("**Inline Table Editor:** Review and edit values directly in the table, then Approve or Reject")
                 
-                # Select a pending review
-                record_options = ["-- Select a pending review --"]
-                for i, row in pending_reviews.iterrows():
-                    maker = row.get('reviewed_by_maker', 'Unknown')
-                    date = row.get('reviewed_date_maker', 'Unknown')
-                    size = row.get('business_reviewed_size_pending', '')
-                    gender = row.get('business_reviewed_gender_pending', '')
-                    record_display = f"By {maker} on {date} - Size: {size}, Gender: {gender}"
-                    record_options.append(record_display)
+                # Configure column settings for inline editing
+                column_config = {}
+                for col in pending_reviews.columns:
+                    if col == "business_reviewed_size":
+                        column_config[col] = st.column_config.SelectboxColumn(
+                            "Business Size (Final)",
+                            help="Edit if needed before approving",
+                            options=BUSINESS_SIZE_OPTIONS,
+                            required=True
+                        )
+                    elif col == "business_reviewed_gender":
+                        column_config[col] = st.column_config.SelectboxColumn(
+                            "Gender (Final)",
+                            help="Edit if needed before approving",
+                            options=GENDER_OPTIONS,
+                            required=True
+                        )
+                    elif col in ["business_reviewed_size_pending", "business_reviewed_gender_pending",
+                               "reviewed_by_maker", "reviewed_date_maker", "review_status"]:
+                        # Show these columns as read-only
+                        column_config[col] = st.column_config.Column(
+                            col.replace("_", " ").title(),
+                            disabled=True
+                        )
+                    elif col not in ["reviewed_by_checker", "reviewed_date_checker", "checker_comments"]:
+                        # Make other columns read-only
+                        column_config[col] = st.column_config.Column(
+                            col,
+                            disabled=True
+                        )
                 
-                selected_option = st.selectbox(
-                    "Select review to check:",
-                    range(len(record_options)),
-                    format_func=lambda x: record_options[x],
-                    index=0,
-                    key="checker_select"
+                # Use data_editor for inline editing
+                edited_data = st.data_editor(
+                    pending_reviews,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=column_config,
+                    num_rows="fixed",
+                    key="checker_data_editor"
                 )
                 
-                if selected_option > 0:
-                    selected_idx = list(pending_reviews.index)[selected_option - 1]
-                    selected_record = pending_reviews.loc[selected_idx]
-                    
-                    # Show record details
-                    with st.expander("📋 Full Record Details", expanded=False):
-                        st.json(selected_record.to_dict())
-                    
-                    # Show review details
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write("**Maker's Submission:**")
-                        st.info(f"👤 Maker: {selected_record.get('reviewed_by_maker')}")
-                        st.info(f"📅 Date: {selected_record.get('reviewed_date_maker')}")
-                        st.success(f"📏 Size: {selected_record.get('business_reviewed_size_pending')}")
-                        st.success(f"👥 Gender: {selected_record.get('business_reviewed_gender_pending')}")
-                    
-                    with col2:
-                        st.write("**Checker Actions:**")
-                        
-                        # Option to edit before approving
-                        with st.form("checker_form"):
-                            st.write("Edit if needed before approving:")
+                # Add comments field
+                checker_comments = st.text_area(
+                    "Comments (required for rejection, optional for approval):",
+                    key="checker_comments_bulk"
+                )
+                
+                # Action buttons
+                col_approve, col_reject = st.columns(2)
+                with col_approve:
+                    if st.button("✅ Approve Selected Records", type="primary", key="checker_approve"):
+                        try:
+                            conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+                            approved_count = 0
                             
-                            edited_size = render_form_field(
-                                "business_reviewed_size",
-                                "string",
-                                selected_record.get('business_reviewed_size_pending'),
-                                "checker_edit"
-                            )
+                            for idx in pending_reviews.index:
+                                edited_row = edited_data.loc[idx]
+                                
+                                # Get edited values (copy from pending if not edited)
+                                size_val = edited_row.get("business_reviewed_size")
+                                gender_val = edited_row.get("business_reviewed_gender")
+                                
+                                # If not edited, use pending values
+                                if pd.isna(size_val) or size_val == "":
+                                    size_val = edited_row.get("business_reviewed_size_pending")
+                                if pd.isna(gender_val) or gender_val == "":
+                                    gender_val = edited_row.get("business_reviewed_gender_pending")
+                                
+                                # Create WHERE clause
+                                first_col = list(st.session_state.table_schema.keys())[0]
+                                first_val = edited_row[first_col]
+                                
+                                if isinstance(first_val, str):
+                                    escaped_val = first_val.replace("'", "''")
+                                    where_clause = f"{first_col} = '{escaped_val}'"
+                                else:
+                                    where_clause = f"{first_col} = {first_val}"
+                                
+                                update_data = {
+                                    "business_reviewed_size": size_val,
+                                    "business_reviewed_gender": gender_val,
+                                    "review_status": STATUS_APPROVED,
+                                    "reviewed_by_checker": current_user,
+                                    "reviewed_date_checker": get_manila_timestamp(),
+                                    "checker_comments": checker_comments if checker_comments else ""
+                                }
+                                
+                                update_record(TABLE_NAME, update_data, where_clause, conn)
+                                approved_count += 1
                             
-                            edited_gender = render_form_field(
-                                "business_reviewed_gender",
-                                "string",
-                                selected_record.get('business_reviewed_gender_pending'),
-                                "checker_edit"
-                            )
-                            
-                            checker_comments = st.text_area(
-                                "Comments (optional):",
-                                key="checker_comments"
-                            )
-                            
-                            col_approve, col_reject = st.columns(2)
-                            with col_approve:
-                                approve_btn = st.form_submit_button("✅ Approve", type="primary")
-                            with col_reject:
-                                reject_btn = st.form_submit_button("❌ Reject", type="secondary")
-                            
-                            if approve_btn:
-                                try:
-                                    conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+                            st.success(f"✅ Approved {approved_count} record(s)!")
+                            st.session_state.table_data = None
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error: {str(e)}")
+                
+                with col_reject:
+                    if st.button("❌ Reject Selected Records", type="secondary", key="checker_reject"):
+                        if not checker_comments:
+                            st.error("❌ Please provide comments when rejecting")
+                        else:
+                            try:
+                                conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+                                rejected_count = 0
+                                
+                                for idx in pending_reviews.index:
+                                    edited_row = edited_data.loc[idx]
+                                    
+                                    # Create WHERE clause
                                     first_col = list(st.session_state.table_schema.keys())[0]
-                                    first_val = selected_record[first_col]
+                                    first_val = edited_row[first_col]
                                     
                                     if isinstance(first_val, str):
                                         escaped_val = first_val.replace("'", "''")
@@ -500,49 +544,20 @@ if st.session_state.connection_established and st.session_state.table_data is no
                                         where_clause = f"{first_col} = {first_val}"
                                     
                                     update_data = {
-                                        "business_reviewed_size": edited_size,
-                                        "business_reviewed_gender": edited_gender,
-                                        "review_status": STATUS_APPROVED,
+                                        "review_status": STATUS_REJECTED,
                                         "reviewed_by_checker": current_user,
                                         "reviewed_date_checker": get_manila_timestamp(),
-                                        "checker_comments": checker_comments if checker_comments else ""
+                                        "checker_comments": checker_comments
                                     }
                                     
                                     update_record(TABLE_NAME, update_data, where_clause, conn)
-                                    st.success("✅ Review APPROVED!")
-                                    st.session_state.table_data = None
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"❌ Error: {str(e)}")
-                            
-                            if reject_btn:
-                                if not checker_comments:
-                                    st.error("❌ Please provide comments when rejecting")
-                                else:
-                                    try:
-                                        conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
-                                        first_col = list(st.session_state.table_schema.keys())[0]
-                                        first_val = selected_record[first_col]
-                                        
-                                        if isinstance(first_val, str):
-                                            escaped_val = first_val.replace("'", "''")
-                                            where_clause = f"{first_col} = '{escaped_val}'"
-                                        else:
-                                            where_clause = f"{first_col} = {first_val}"
-                                        
-                                        update_data = {
-                                            "review_status": STATUS_REJECTED,
-                                            "reviewed_by_checker": current_user,
-                                            "reviewed_date_checker": get_manila_timestamp(),
-                                            "checker_comments": checker_comments
-                                        }
-                                        
-                                        update_record(TABLE_NAME, update_data, where_clause, conn)
-                                        st.success("✅ Review REJECTED!")
-                                        st.session_state.table_data = None
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"❌ Error: {str(e)}")
+                                    rejected_count += 1
+                                
+                                st.success(f"✅ Rejected {rejected_count} record(s)!")
+                                st.session_state.table_data = None
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
             else:
                 st.success("🎉 No pending reviews!")
         
