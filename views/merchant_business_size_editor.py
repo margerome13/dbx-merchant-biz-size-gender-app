@@ -305,14 +305,14 @@ if st.session_state.connection_established and st.session_state.table_data is no
                 for col in display_data.columns:
                     if col == "business_reviewed_size_pending":
                         column_config[col] = st.column_config.SelectboxColumn(
-                            "Business Size (Pending)",
+                            "Business Size (Pending) 🟣",
                             help="Select business size",
                             options=BUSINESS_SIZE_OPTIONS,
                             required=True
                         )
                     elif col == "business_reviewed_gender_pending":
                         column_config[col] = st.column_config.SelectboxColumn(
-                            "Gender (Pending)",
+                            "Gender (Pending) 🟣",
                             help="Select gender",
                             options=GENDER_OPTIONS,
                             required=True
@@ -338,17 +338,8 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             disabled=True
                         )
                 
-                # Custom CSS for column styling
-                st.markdown("""
-                <style>
-                /* Style for pending columns - light purple background, black text */
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
-                    background-color: #D5D0E5 !important;
-                    color: black !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                # Note: Streamlit data_editor doesn't support custom column colors
+                # The columns are configured but colors must be applied via Streamlit theme
                 
                 # Use data_editor for inline editing
                 edited_data = st.data_editor(
@@ -437,7 +428,7 @@ if st.session_state.connection_established and st.session_state.table_data is no
                 
                 filtered_data = my_submissions[my_submissions['review_status'].isin(status_filter)]
                 
-                # Configure column settings with frozen columns and styling
+                # Configure column settings with frozen columns and visual indicators
                 column_config = {}
                 for col in filtered_data.columns:
                     if col in ["cpm_id", "business_name", "trade_name"]:
@@ -446,18 +437,16 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             col.replace("_", " ").title(),
                             pinned=True
                         )
+                    elif col == "business_reviewed_size_pending":
+                        column_config[col] = st.column_config.Column(
+                            "Business Size (Pending) 🟣"
+                        )
+                    elif col == "business_reviewed_gender_pending":
+                        column_config[col] = st.column_config.Column(
+                            "Gender (Pending) 🟣"
+                        )
                 
-                # Custom CSS for column styling
-                st.markdown("""
-                <style>
-                /* Style for pending columns - light purple background, black text */
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
-                    background-color: #D5D0E5 !important;
-                    color: black !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                # Remove CSS styling as it doesn't work with st.dataframe
                 
                 # Select relevant columns to display
                 display_columns = [col for col in filtered_data.columns 
@@ -523,14 +512,14 @@ if st.session_state.connection_established and st.session_state.table_data is no
                 for col in pending_reviews.columns:
                     if col == "business_reviewed_size":
                         column_config[col] = st.column_config.SelectboxColumn(
-                            "Business Size (Final)",
+                            "Business Size (Final) 🟢",
                             help="Edit if needed before approving",
                             options=BUSINESS_SIZE_OPTIONS,
                             required=True
                         )
                     elif col == "business_reviewed_gender":
                         column_config[col] = st.column_config.SelectboxColumn(
-                            "Gender (Final)",
+                            "Gender (Final) 🟢",
                             help="Edit if needed before approving",
                             options=GENDER_OPTIONS,
                             required=True
@@ -542,8 +531,17 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             disabled=True,
                             pinned=True
                         )
-                    elif col in ["business_reviewed_size_pending", "business_reviewed_gender_pending",
-                               "reviewed_by_maker", "reviewed_date_maker", "review_status"]:
+                    elif col == "business_reviewed_size_pending":
+                        column_config[col] = st.column_config.Column(
+                            "Business Size (Pending) 🟣",
+                            disabled=True
+                        )
+                    elif col == "business_reviewed_gender_pending":
+                        column_config[col] = st.column_config.Column(
+                            "Gender (Pending) 🟣",
+                            disabled=True
+                        )
+                    elif col in ["reviewed_by_maker", "reviewed_date_maker", "review_status"]:
                         # Show these columns as read-only
                         column_config[col] = st.column_config.Column(
                             col.replace("_", " ").title(),
@@ -556,23 +554,8 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             disabled=True
                         )
                 
-                # Custom CSS for column styling
-                st.markdown("""
-                <style>
-                /* Style for pending columns - light purple background, black text */
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
-                    background-color: #D5D0E5 !important;
-                    color: black !important;
-                }
-                /* Style for final columns - dark green background, white text */
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size"],
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender"] {
-                    background-color: #074F11 !important;
-                    color: white !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                # Note: Streamlit data_editor doesn't support custom column background colors
+                # Using emoji indicators instead: 🟣 for pending, 🟢 for final
                 
                 # Use data_editor for inline editing
                 edited_data = st.data_editor(
@@ -697,7 +680,7 @@ if st.session_state.connection_established and st.session_state.table_data is no
             ]
             
             if len(filtered_data) > 0:
-                # Configure column settings with frozen columns
+                # Configure column settings with frozen columns and visual indicators
                 column_config = {}
                 for col in filtered_data.columns:
                     if col in ["cpm_id", "business_name", "trade_name"]:
@@ -706,24 +689,25 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             col.replace("_", " ").title(),
                             pinned=True
                         )
+                    elif col == "business_reviewed_size_pending":
+                        column_config[col] = st.column_config.Column(
+                            "Business Size (Pending) 🟣"
+                        )
+                    elif col == "business_reviewed_gender_pending":
+                        column_config[col] = st.column_config.Column(
+                            "Gender (Pending) 🟣"
+                        )
+                    elif col == "business_reviewed_size":
+                        column_config[col] = st.column_config.Column(
+                            "Business Size (Final) 🟢"
+                        )
+                    elif col == "business_reviewed_gender":
+                        column_config[col] = st.column_config.Column(
+                            "Gender (Final) 🟢"
+                        )
                 
-                # Custom CSS for column styling
-                st.markdown("""
-                <style>
-                /* Style for pending columns - light purple background, black text */
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
-                    background-color: #D5D0E5 !important;
-                    color: black !important;
-                }
-                /* Style for final columns - dark green background, white text */
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size"],
-                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender"] {
-                    background-color: #074F11 !important;
-                    color: white !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                # Note: Streamlit dataframe doesn't support custom column background colors
+                # Using emoji indicators instead: 🟣 for pending, 🟢 for final
                 
                 # Select relevant columns to display
                 display_columns = [col for col in filtered_data.columns 
