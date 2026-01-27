@@ -317,6 +317,13 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             options=GENDER_OPTIONS,
                             required=True
                         )
+                    elif col in ["cpm_id", "business_name", "trade_name"]:
+                        # Freeze these columns
+                        column_config[col] = st.column_config.Column(
+                            col.replace("_", " ").title(),
+                            disabled=True,
+                            pinned=True
+                        )
                     elif col in ["review_status", "reviewed_by_maker", "reviewed_date_maker", 
                                "reviewed_by_checker", "reviewed_date_checker", "checker_comments"]:
                         # Show these columns but make them read-only
@@ -330,6 +337,18 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             col,
                             disabled=True
                         )
+                
+                # Custom CSS for column styling
+                st.markdown("""
+                <style>
+                /* Style for pending columns - light purple background, black text */
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
+                    background-color: #D5D0E5 !important;
+                    color: black !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
                 
                 # Use data_editor for inline editing
                 edited_data = st.data_editor(
@@ -418,15 +437,40 @@ if st.session_state.connection_established and st.session_state.table_data is no
                 
                 filtered_data = my_submissions[my_submissions['review_status'].isin(status_filter)]
                 
+                # Configure column settings with frozen columns and styling
+                column_config = {}
+                for col in filtered_data.columns:
+                    if col in ["cpm_id", "business_name", "trade_name"]:
+                        # Freeze these columns
+                        column_config[col] = st.column_config.Column(
+                            col.replace("_", " ").title(),
+                            pinned=True
+                        )
+                
+                # Custom CSS for column styling
+                st.markdown("""
+                <style>
+                /* Style for pending columns - light purple background, black text */
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
+                    background-color: #D5D0E5 !important;
+                    color: black !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Select relevant columns to display
+                display_columns = [col for col in filtered_data.columns 
+                    if col in ['cpm_id', 'business_name', 'trade_name',
+                             'business_reviewed_size_pending', 'business_reviewed_gender_pending',
+                             'review_status', 'reviewed_date_maker', 'reviewed_by_checker',
+                             'reviewed_date_checker', 'checker_comments']]
+                
                 st.dataframe(
-                    filtered_data[[
-                        col for col in filtered_data.columns 
-                        if col in ['business_reviewed_size_pending', 'business_reviewed_gender_pending',
-                                 'review_status', 'reviewed_date_maker', 'reviewed_by_checker',
-                                 'reviewed_date_checker', 'checker_comments']
-                    ]],
+                    filtered_data[display_columns],
                     use_container_width=True,
-                    hide_index=True
+                    hide_index=True,
+                    column_config=column_config
                 )
                 
                 st.metric("Total Submissions", len(my_submissions))
@@ -491,6 +535,13 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             options=GENDER_OPTIONS,
                             required=True
                         )
+                    elif col in ["cpm_id", "business_name", "trade_name"]:
+                        # Freeze these columns
+                        column_config[col] = st.column_config.Column(
+                            col.replace("_", " ").title(),
+                            disabled=True,
+                            pinned=True
+                        )
                     elif col in ["business_reviewed_size_pending", "business_reviewed_gender_pending",
                                "reviewed_by_maker", "reviewed_date_maker", "review_status"]:
                         # Show these columns as read-only
@@ -504,6 +555,24 @@ if st.session_state.connection_established and st.session_state.table_data is no
                             col,
                             disabled=True
                         )
+                
+                # Custom CSS for column styling
+                st.markdown("""
+                <style>
+                /* Style for pending columns - light purple background, black text */
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
+                    background-color: #D5D0E5 !important;
+                    color: black !important;
+                }
+                /* Style for final columns - dark green background, white text */
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size"],
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender"] {
+                    background-color: #074F11 !important;
+                    color: white !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
                 
                 # Use data_editor for inline editing
                 edited_data = st.data_editor(
@@ -628,16 +697,47 @@ if st.session_state.connection_established and st.session_state.table_data is no
             ]
             
             if len(filtered_data) > 0:
+                # Configure column settings with frozen columns
+                column_config = {}
+                for col in filtered_data.columns:
+                    if col in ["cpm_id", "business_name", "trade_name"]:
+                        # Freeze these columns
+                        column_config[col] = st.column_config.Column(
+                            col.replace("_", " ").title(),
+                            pinned=True
+                        )
+                
+                # Custom CSS for column styling
+                st.markdown("""
+                <style>
+                /* Style for pending columns - light purple background, black text */
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size_pending"],
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender_pending"] {
+                    background-color: #D5D0E5 !important;
+                    color: black !important;
+                }
+                /* Style for final columns - dark green background, white text */
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_size"],
+                [data-testid="stDataFrame"] [data-testid="column-business_reviewed_gender"] {
+                    background-color: #074F11 !important;
+                    color: white !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Select relevant columns to display
+                display_columns = [col for col in filtered_data.columns 
+                    if col in ['cpm_id', 'business_name', 'trade_name',
+                             'business_reviewed_size_pending', 'business_reviewed_gender_pending',
+                             'business_reviewed_size', 'business_reviewed_gender',
+                             'review_status', 'reviewed_by_maker', 'reviewed_date_maker',
+                             'reviewed_by_checker', 'reviewed_date_checker', 'checker_comments']]
+                
                 st.dataframe(
-                    filtered_data[[
-                        col for col in filtered_data.columns 
-                        if col in ['business_reviewed_size_pending', 'business_reviewed_gender_pending',
-                                 'business_reviewed_size', 'business_reviewed_gender',
-                                 'review_status', 'reviewed_by_maker', 'reviewed_date_maker',
-                                 'reviewed_by_checker', 'reviewed_date_checker', 'checker_comments']
-                    ]],
+                    filtered_data[display_columns],
                     use_container_width=True,
-                    hide_index=True
+                    hide_index=True,
+                    column_config=column_config
                 )
                 
                 # Statistics
