@@ -11,21 +11,20 @@ Roles: ADMIN, MAKER, CHECKER
 
 # Admin users - can switch roles and access everything
 ADMINS = [
-    "mar.abana@unionbankph.com",
+    "mar.abana@paymaya.com"
     # Add more admin emails here
 ]
 
 # Maker users - can submit reviews
 MAKERS = [
-    "maker1@unionbankph.com",
-    "maker2@unionbankph.com",
+    "revylen.asilo@paymaya.com",
+    "revylen.asilo@maya.ph",
     # Add more maker emails here
 ]
 
 # Checker users - can approve/reject reviews
 CHECKERS = [
-    "checker1@unionbankph.com",
-    "checker2@unionbankph.com",
+    ""
     # Add more checker emails here
 ]
 
