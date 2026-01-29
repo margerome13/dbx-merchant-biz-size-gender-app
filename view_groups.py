@@ -13,12 +13,6 @@ groups = [
                 "page": "views/csv_upload_to_table.py",
                 "icon": ":material/upload_file:",
             },
-            {
-                "label": "DQ MDAR Masterfile Editor",
-                "help": "Pre-configured form editor for the DQ MDAR Inventory Masterfile table.",
-                "page": "views/dq_mdar_masterfile_editor.py",
-                "icon": ":material/folder_managed:",
-            },
         ],
     },
 ]
