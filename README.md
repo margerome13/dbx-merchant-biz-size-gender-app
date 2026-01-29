@@ -18,6 +18,13 @@ The app implements a complete approval workflow with three statuses:
 - **APPROVED**: Validated and finalized by checker
 - **REJECTED**: Returned to maker with feedback
 
+### 📤 CSV Bulk Upload
+- **Upload CSV files** to create or update Delta tables
+- **Three upload modes**: Create new, Append, or Overwrite
+- **Automatic backup** to Unity Catalog Volume
+- **Data preview** and validation before upload
+- **Metadata tracking** with upload timestamp and user
+
 ### 📊 Multi-Environment Support
 - **Dev Environment**: `dg_dev.sandbox.out_merchant_business_size_for_bank`
 - **Prod Test Environment**: `dg_prod.sandbox.out_merchant_business_size_for_bank_test`
@@ -43,6 +50,18 @@ The app implements a complete approval workflow with three statuses:
 4. **Monitor** all reviews and statistics
 
 ## Functionalities
+
+### CSV Bulk Upload
+- **Upload CSV Files**: Drag and drop or select CSV files for bulk data import
+- **Three Upload Modes**:
+  - Create New Table: Initialize new Delta tables from CSV
+  - Append to Existing: Add new records to existing tables
+  - Overwrite Existing: Replace all data in existing tables
+- **Data Preview**: View first 10 rows and column information before upload
+- **Automatic Backup**: CSV files stored in Unity Catalog Volume for audit trail
+- **Metadata Tracking**: Optional columns for upload timestamp and user
+- **Type Inference**: Automatic SQL type detection from CSV data
+- **Progress Tracking**: Real-time upload progress with status updates
 
 ### For Makers
 - **Submit New Review**: Select records and propose business size and gender classifications
@@ -136,6 +155,16 @@ The target table must include these columns:
 - `checker_comments` - Checker's feedback
 
 ## Usage
+
+### CSV Bulk Upload
+1. Navigate to "CSV Upload to Table" in the sidebar
+2. Upload your CSV file (max recommended: 100MB)
+3. Preview the data and column information
+4. Specify target table name (catalog.schema.table_name)
+5. Choose upload mode (Create/Append/Overwrite)
+6. Optionally enable metadata columns
+7. Click "Upload and Create/Update Table"
+8. Verify success and check backup location
 
 ### As a Maker
 1. Select "MAKER" role from the dropdown
