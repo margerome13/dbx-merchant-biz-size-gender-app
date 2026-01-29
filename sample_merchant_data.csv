@@ -1,0 +1,11 @@
+merchant_id,merchant_name,business_reviewed_size_pending,business_reviewed_gender_pending,revenue,location,review_status
+M001,ABC Trading,SMALL,MALE,50000,Manila,
+M002,XYZ Enterprises,MEDIUM,FEMALE,150000,Cebu,
+M003,Quick Shop,MICRO,MALE,10000,Davao,
+M004,Global Imports,LARGE,FEMALE,500000,Manila,
+M005,Local Market,SMALL,MALE,75000,Quezon City,
+M006,Tech Solutions,MEDIUM,MALE,200000,Makati,
+M007,Food Corner,MICRO,FEMALE,8000,Pasig,
+M008,Fashion Hub,SMALL,FEMALE,60000,BGC,
+M009,Auto Parts Co,MEDIUM,MALE,180000,Caloocan,
+M010,Home Essentials,SMALL,FEMALE,55000,Mandaluyong,
