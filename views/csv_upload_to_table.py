@@ -37,12 +37,12 @@ def get_current_user_email() -> str:
         # Method 1: Try to get from Streamlit context (X-Forwarded-Preferred-Username header)
         # This is the most reliable method in Databricks Apps
         try:
-            from streamlit.web.server.websocket_headers import _get_websocket_headers
-            headers = _get_websocket_headers()
-            if headers:
-                username = headers.get("X-Forwarded-Preferred-Username")
-                if username and '@' in username:
-                    return username
+            if hasattr(st, 'context') and hasattr(st.context, 'headers'):
+                headers = st.context.headers
+                if headers:
+                    username = headers.get("X-Forwarded-Preferred-Username")
+                    if username and '@' in username:
+                        return username
         except Exception:
             pass
         
