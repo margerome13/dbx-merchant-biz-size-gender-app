@@ -185,44 +185,60 @@ def create_table_from_dataframe(df: pd.DataFrame, table_name: str, conn):
         cursor.execute(create_sql)
 
 def insert_data_to_table(df: pd.DataFrame, table_name: str, conn, mode: str = "append"):
-    """Insert DataFrame data into Delta table"""
+    """Insert DataFrame data into Delta table with batching to avoid parameter limit"""
     rows = list(df.itertuples(index=False, name=None))
     if not rows:
         return
     
     cols = list(df.columns)
-    params = {}
-    values_sql_parts = []
-    p = 0
-    
-    # Build parameterized query
-    for row in rows:
-        ph = []
-        for v in row:
-            key = f"p{p}"
-            ph.append(f":{key}")
-            # Handle None/NaN values
-            if pd.isna(v):
-                params[key] = None
-            else:
-                params[key] = v
-            p += 1
-        values_sql_parts.append("(" + ",".join(ph) + ")")
-    
-    values_sql = ",".join(values_sql_parts)
     col_list_sql = ",".join([f"`{col}`" for col in cols])
     
-    with conn.cursor() as cursor:
-        if mode == "overwrite":
-            cursor.execute(
-                f"INSERT OVERWRITE {table_name} ({col_list_sql}) VALUES {values_sql}",
-                params
-            )
-        else:  # append
-            cursor.execute(
-                f"INSERT INTO {table_name} ({col_list_sql}) VALUES {values_sql}",
-                params
-            )
+    # Databricks SQL has a 256 parameter limit
+    # Calculate batch size: 256 / number_of_columns (with some buffer)
+    max_params = 250  # Use 250 to be safe
+    num_cols = len(cols)
+    batch_size = max(1, max_params // num_cols)
+    
+    # For overwrite mode, we need to handle the first batch specially
+    is_first_batch = True
+    
+    # Process rows in batches
+    for i in range(0, len(rows), batch_size):
+        batch_rows = rows[i:i + batch_size]
+        params = {}
+        values_sql_parts = []
+        p = 0
+        
+        # Build parameterized query for this batch
+        for row in batch_rows:
+            ph = []
+            for v in row:
+                key = f"p{p}"
+                ph.append(f":{key}")
+                # Handle None/NaN values
+                if pd.isna(v):
+                    params[key] = None
+                else:
+                    params[key] = v
+                p += 1
+            values_sql_parts.append("(" + ",".join(ph) + ")")
+        
+        values_sql = ",".join(values_sql_parts)
+        
+        with conn.cursor() as cursor:
+            if mode == "overwrite" and is_first_batch:
+                # First batch in overwrite mode uses INSERT OVERWRITE
+                cursor.execute(
+                    f"INSERT OVERWRITE {table_name} ({col_list_sql}) VALUES {values_sql}",
+                    params
+                )
+                is_first_batch = False
+            else:
+                # Subsequent batches or append mode use INSERT INTO
+                cursor.execute(
+                    f"INSERT INTO {table_name} ({col_list_sql}) VALUES {values_sql}",
+                    params
+                )
 
 # Page header
 st.header(body="CSV Upload to Databricks Table", divider=True)
