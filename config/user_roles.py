@@ -1,6 +1,5 @@
 """
 User Role Configuration for Merchant Business Size and Gender Review App
-
 This file defines which users have which roles.
 Roles: ADMIN, MAKER, CHECKER
 
@@ -18,7 +17,6 @@ ADMINS = [
 # Maker users - can submit reviews
 MAKERS = [
     "louisse.ramos@paymaya.com",
-    "gilbert.lavides@paymaya.com"
     # Add more maker emails here
 ]
 

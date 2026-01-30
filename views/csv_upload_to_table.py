@@ -167,6 +167,11 @@ def table_exists(table_name: str, conn) -> bool:
     except Exception:
         return False
 
+def drop_table(table_name: str, conn):
+    """Drop a table if it exists"""
+    with conn.cursor() as cursor:
+        cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+
 def create_table_from_dataframe(df: pd.DataFrame, table_name: str, conn):
     """Create Delta table from DataFrame"""
     columns_def = []
@@ -314,9 +319,13 @@ with tab_upload:
             with col_right:
                 upload_mode = st.selectbox(
                     "Upload Mode:",
-                    ["Create New Table", "Append to Existing Table", "Overwrite Existing Table"],
+                    ["Create New Table", "Append to Existing Table", "Overwrite Existing Table", "Replace Table (Schema + Data)"],
                     help="Choose how to handle the data"
                 )
+            
+            # Show warning for destructive Replace mode
+            if upload_mode == "Replace Table (Schema + Data)":
+                st.warning("⚠️ **Warning:** This will DROP the existing table and recreate it with the CSV's schema. All existing data and schema will be permanently lost!")
             
             # Additional options
             with st.expander("🔧 Advanced Options"):
@@ -431,7 +440,7 @@ uploaded_by: STRING (user email)
                                 - ✅ Backup: `{volume_path}`
                                 """)
                         
-                        else:  # Overwrite
+                        elif upload_mode == "Overwrite Existing Table":
                             if not table_exists(target_table, conn):
                                 create_table_from_dataframe(df_to_upload, target_table, conn)
                                 st.info(f"ℹ️ Table `{target_table}` created (did not exist)")
@@ -449,6 +458,38 @@ uploaded_by: STRING (user email)
                             st.success(f"""
                             **Upload Summary:**
                             - ✅ {len(df_to_upload)} rows written (overwrite mode)
+                            - ✅ Table: `{target_table}`
+                            - ✅ Backup: `{volume_path}`
+                            """)
+                        
+                        else:  # Replace Table (Schema + Data)
+                            # Step 6: Drop and recreate table
+                            status_text.info("🗑️ Dropping existing table...")
+                            progress_bar.progress(75)
+                            
+                            drop_table(target_table, conn)
+                            st.info(f"ℹ️ Table `{target_table}` dropped")
+                            
+                            status_text.info("🏗️ Creating new table with CSV schema...")
+                            progress_bar.progress(80)
+                            
+                            create_table_from_dataframe(df_to_upload, target_table, conn)
+                            st.success(f"✅ Table `{target_table}` recreated with new schema!")
+                            
+                            # Step 7: Insert data
+                            status_text.info("💾 Inserting data...")
+                            progress_bar.progress(90)
+                            
+                            insert_data_to_table(df_to_upload, target_table, conn, mode="append")
+                            
+                            progress_bar.progress(100)
+                            status_text.success("✅ Upload complete!")
+                            st.balloons()
+                            
+                            st.success(f"""
+                            **Upload Summary:**
+                            - ✅ Table replaced with new schema
+                            - ✅ {len(df_to_upload)} rows inserted
                             - ✅ Table: `{target_table}`
                             - ✅ Backup: `{volume_path}`
                             """)
@@ -542,11 +583,20 @@ with tab_help:
     - Adds new rows to existing data
     - Keeps all existing records
     - Column names must match existing table
+    - Table schema remains unchanged
     
     **Overwrite Existing Table:**
     - Replaces all data in table
-    - Keeps table structure
+    - Keeps table structure/schema
+    - Column names must match existing table
     - Use with caution!
+    
+    **Replace Table (Schema + Data):** ⚠️ DESTRUCTIVE
+    - Drops the existing table completely
+    - Creates a new table with CSV's schema
+    - Inserts all CSV data
+    - Use when CSV has different columns than existing table
+    - **Warning:** All existing data is permanently lost!
     
     ### Integration with Maker-Checker Workflow
     
@@ -567,6 +617,7 @@ with tab_help:
     **"Column mismatch" error:**
     - Ensure CSV columns match table structure
     - Check column names and types
+    - Or use "Replace Table (Schema + Data)" mode to replace the schema
     
     **Large file upload slow:**
     - Consider splitting into smaller files
