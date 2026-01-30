@@ -34,7 +34,25 @@ def get_connection(server_hostname: str, http_path: str):
 def get_current_user_email() -> str:
     """Get the current user's Databricks email - no caching to ensure fresh data"""
     try:
-        # Method 1: Try SQL query to get current user (most reliable in Databricks Apps)
+        # Method 1: Try to get from Streamlit context (X-Forwarded-Preferred-Username header)
+        # This is the most reliable method in Databricks Apps
+        try:
+            from streamlit.web.server.websocket_headers import _get_websocket_headers
+            headers = _get_websocket_headers()
+            if headers:
+                username = headers.get("X-Forwarded-Preferred-Username")
+                if username and '@' in username:
+                    return username
+        except Exception:
+            pass
+        
+        # Method 2: Try Streamlit's experimental user info
+        if hasattr(st, 'experimental_user') and st.experimental_user:
+            user_email = st.experimental_user.get('email')
+            if user_email and '@' in user_email:
+                return user_email
+        
+        # Method 3: Try SQL query to get current user
         try:
             conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
             with conn.cursor() as cursor:
@@ -45,16 +63,10 @@ def get_current_user_email() -> str:
                     # If it's an email, return it
                     if '@' in str(user_value):
                         return str(user_value)
-        except Exception as sql_error:
+        except Exception:
             pass
         
-        # Method 2: Try Streamlit's experimental user info
-        if hasattr(st, 'experimental_user') and st.experimental_user:
-            user_email = st.experimental_user.get('email')
-            if user_email and '@' in user_email:
-                return user_email
-        
-        # Method 3: Try WorkspaceClient
+        # Method 4: Try WorkspaceClient
         w = WorkspaceClient()
         current_user = w.current_user.me()
         
