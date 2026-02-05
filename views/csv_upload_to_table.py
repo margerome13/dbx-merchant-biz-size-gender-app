@@ -316,17 +316,15 @@ with tab_upload:
                 help="This table is pre-configured for merchant asset size review data"
             )
             
-            # Upload mode with default to Overwrite
-            upload_mode = st.selectbox(
+            # Upload mode - fixed to Overwrite Existing Table
+            upload_mode = "Overwrite Existing Table"
+            st.text_input(
                 "Upload Mode:",
-                ["Create New Table", "Append to Existing Table", "Overwrite Existing Table", "Replace Table (Schema + Data)"],
-                index=2,  # Default to "Overwrite Existing Table"
-                help="Choose how to handle the data"
+                value=upload_mode,
+                disabled=True,
+                help="Upload mode is set to overwrite existing table data"
             )
-            
-            # Show warning for destructive Replace mode
-            if upload_mode == "Replace Table (Schema + Data)":
-                st.warning("⚠️ **Warning:** This will DROP the existing table and recreate it with the CSV's schema. All existing data and schema will be permanently lost!")
+            st.info("ℹ️ This will replace all existing data in the table with the uploaded CSV data.")
             
             # Additional options
             with st.expander("🔧 Advanced Options"):
