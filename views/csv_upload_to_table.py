@@ -307,21 +307,22 @@ with tab_upload:
             # Target table configuration
             st.subheader("🎯 Target Table Configuration")
             
-            col_left, col_right = st.columns(2)
+            # Fixed target table - user cannot change
+            target_table = "dg_dev.z3_stg.merchant_asset_size_review"
+            st.text_input(
+                "Target Table Name:",
+                value=target_table,
+                disabled=True,
+                help="This table is pre-configured for merchant asset size review data"
+            )
             
-            with col_left:
-                target_table = st.text_input(
-                    "Target Table Name:",
-                    placeholder="dg_dev.sandbox.out_merchant_business_size_for_bank",
-                    help="Format: catalog.schema.table_name"
-                )
-            
-            with col_right:
-                upload_mode = st.selectbox(
-                    "Upload Mode:",
-                    ["Create New Table", "Append to Existing Table", "Overwrite Existing Table", "Replace Table (Schema + Data)"],
-                    help="Choose how to handle the data"
-                )
+            # Upload mode with default to Overwrite
+            upload_mode = st.selectbox(
+                "Upload Mode:",
+                ["Create New Table", "Append to Existing Table", "Overwrite Existing Table", "Replace Table (Schema + Data)"],
+                index=2,  # Default to "Overwrite Existing Table"
+                help="Choose how to handle the data"
+            )
             
             # Show warning for destructive Replace mode
             if upload_mode == "Replace Table (Schema + Data)":
