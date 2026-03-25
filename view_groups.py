@@ -16,6 +16,15 @@ def get_groups_for_user(user_email: str):
             "icon": ":material/fact_check:",
         })
     
+    # Admin users also see CSV Download page
+    if is_admin(user_email):
+        views.append({
+            "label": "CSV Download",
+            "help": "Execute SQL queries on-demand and download results as CSV files.",
+            "page": "views/csv_download.py",
+            "icon": ":material/download:",
+        })
+    
     # All users see CSV Upload page
     views.append({
         "label": "CSV Upload to Table",
