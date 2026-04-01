@@ -1,27 +1,28 @@
 import pandas as pd
 import streamlit as st
 from databricks import sql
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config
 from datetime import datetime
 import pytz
 
 from config.download_queries import DOWNLOAD_QUERIES
 
-# Pre-configured connection details
-DATABRICKS_HOST = "dbc-7d305f7c-9def.cloud.databricks.com"
+# Connection details
+cfg = Config()
 HTTP_PATH = "/sql/1.0/warehouses/80e5636f05f63c9b"
 
-# Initialize Databricks clients
-w = WorkspaceClient()
+def get_user_token() -> str:
+    """Get the on-behalf-of user token from Streamlit context headers."""
+    headers = st.context.headers
+    return headers["X-Forwarded-Access-Token"]
 
-@st.cache_resource(ttl="1h")
-def get_connection(server_hostname: str, http_path: str):
-    """Create connection to Databricks SQL warehouse"""
+@st.cache_resource(ttl=300, show_spinner=True)
+def get_obo_connection(http_path: str, user_token: str):
+    """Create connection to Databricks SQL warehouse using OBO user token."""
     return sql.connect(
-        server_hostname=server_hostname,
+        server_hostname=cfg.host,
         http_path=http_path,
-        credentials_provider=lambda: Config().authenticate,
+        access_token=user_token,
     )
 
 def get_current_user_email() -> str:
@@ -97,10 +98,11 @@ if st.button("🚀 Execute Query & Generate Table", type="primary", use_containe
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # Step 1: Connect
-        status_text.info("🔌 Connecting to SQL warehouse...")
+        # Step 1: Connect using OBO token
+        status_text.info("🔌 Connecting to SQL warehouse (on-behalf-of user)...")
         progress_bar.progress(10)
-        conn = get_connection(DATABRICKS_HOST, HTTP_PATH)
+        user_token = get_user_token()
+        conn = get_obo_connection(HTTP_PATH, user_token)
 
         # Step 2: Execute CREATE TABLE query
         status_text.info("⚙️ Executing query (this may take a few minutes)...")
