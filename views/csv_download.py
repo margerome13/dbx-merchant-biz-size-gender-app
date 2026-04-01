@@ -11,18 +11,34 @@ from config.download_queries import DOWNLOAD_QUERIES
 cfg = Config()
 HTTP_PATH = "/sql/1.0/warehouses/80e5636f05f63c9b"
 
-def get_user_token() -> str:
-    """Get the on-behalf-of user token from Streamlit context headers."""
-    headers = st.context.headers
-    return headers["X-Forwarded-Access-Token"]
+def get_user_token() -> str | None:
+    """Get the on-behalf-of user token from Streamlit context headers.
+    Returns None if OBO is not enabled for this app."""
+    try:
+        headers = st.context.headers
+        token = headers.get("x-forwarded-access-token")
+        if token:
+            return token
+    except Exception:
+        pass
+    return None
 
 @st.cache_resource(ttl=300, show_spinner=True)
 def get_obo_connection(http_path: str, user_token: str):
-    """Create connection to Databricks SQL warehouse using OBO user token."""
+    """Create connection using the user's OBO token."""
     return sql.connect(
         server_hostname=cfg.host,
         http_path=http_path,
         access_token=user_token,
+    )
+
+@st.cache_resource(ttl="1h")
+def get_sp_connection(http_path: str):
+    """Fallback connection using service principal credentials."""
+    return sql.connect(
+        server_hostname=cfg.host,
+        http_path=http_path,
+        credentials_provider=lambda: cfg.authenticate,
     )
 
 def get_current_user_email() -> str:
@@ -98,11 +114,16 @@ if st.button("🚀 Execute Query & Generate Table", type="primary", use_containe
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # Step 1: Connect using OBO token
-        status_text.info("🔌 Connecting to SQL warehouse (on-behalf-of user)...")
-        progress_bar.progress(10)
+        # Step 1: Connect (OBO if available, otherwise service principal)
         user_token = get_user_token()
-        conn = get_obo_connection(HTTP_PATH, user_token)
+        if user_token:
+            status_text.info("🔌 Connecting as current user (on-behalf-of)...")
+            progress_bar.progress(10)
+            conn = get_obo_connection(HTTP_PATH, user_token)
+        else:
+            status_text.info("🔌 Connecting to SQL warehouse...")
+            progress_bar.progress(10)
+            conn = get_sp_connection(HTTP_PATH)
 
         # Step 2: Execute CREATE TABLE query
         status_text.info("⚙️ Executing query (this may take a few minutes)...")
