@@ -1,4 +1,4 @@
-from config.user_roles import is_admin
+from config.user_roles import is_admin, is_maker
 
 def get_groups_for_user(user_email: str):
     """
@@ -16,8 +16,8 @@ def get_groups_for_user(user_email: str):
             "icon": ":material/fact_check:",
         })
     
-    # Admin users also see CSV Download page
-    if is_admin(user_email):
+    # Admin and Maker users see CSV Download page
+    if is_maker(user_email):
         views.append({
             "label": "CSV Download",
             "help": "Execute SQL queries on-demand and download results as CSV files.",
