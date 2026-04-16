@@ -17,6 +17,8 @@ ADMINS = [
 # Maker users - can submit reviews
 MAKERS = [
     "louisse.ramos@paymaya.com",
+    "gilbert.lavides@paymaya.com",
+    "roynald.palma@paymaya.com",
     # Add more maker emails here
 ]
 
