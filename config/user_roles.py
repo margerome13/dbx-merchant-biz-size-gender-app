@@ -19,6 +19,7 @@ MAKERS = [
     "louisse.ramos@paymaya.com",
     "gilbert.lavides@paymaya.com",
     "roynald.palma@paymaya.com",
+    "don.losentes@paymaya.com",
     # Add more maker emails here
 ]
 
