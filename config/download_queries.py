@@ -126,7 +126,7 @@ final as (
 select distinct *
 from final
 where true
-    and loan_product = 'MAYA_FLEXI_ENTERPRISE_LOAN'
+    and loan_product in ('MAYA_FLEXI_ENTERPRISE_LOAN', 'MAYA_FLEXI_V2_ENTERPRISE_LOAN')
     and (
         coalesce(asset_size,sf_business_size,amanda_business_size) is null
         or coalesce(asset_size,sf_business_size,amanda_business_size) = 'LARGE'
