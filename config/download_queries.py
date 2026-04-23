@@ -6,10 +6,10 @@ Update queries here when criteria change — no need to modify the app view code
 DOWNLOAD_QUERIES = {
     "merchant_business_size_for_bank": {
         "label": "Merchant Business Size for Bank",
-        "description": "Generates merchant business size data for bank reporting. Filters for MAYA_FLEXI_ENTERPRISE_LOAN with missing/LARGE asset size or missing gender.",
+        "description": "Generates merchant business size data for bank reporting. Filters for MAYA_FLEXI_ENTERPRISE_LOAN and MAYA_FLEXI_V2_ENTERPRISE_LOAN with missing/LARGE asset size or missing gender.",
         "target_table": "dg_dev.sandbox.out_merchant_business_size_for_bank",
         "sql": """
-CREATE OR REPLACE TABLE dg_dev.sandbox.out_merchant_business_size_for_bank AS
+create or replace table dg_dev.sandbox.out_merchant_business_size_for_bank as
 with mambu_groups as (
     select
         *,
@@ -34,7 +34,7 @@ amanda as (
     select * from de_prod.dlake_customers__epm.z1_amanda_user__ams_merchant
 ),
 
-mambu_deposit_prods as (
+mambu_deposit_prods (
     select
         encoded_key,
         name,
@@ -60,6 +60,24 @@ mambu_deposit_accts as (
         date_format(from_utc_timestamp(maturity_date,'Asia/Manila'),'yyyy-MM-dd HH:mm:ss') as maturity_date_pht
     from de_maya_prod.dlake_maya_accounts__las.z1_mambu__deposit_accounts
 ),
+credit_history as (
+    SELECT
+        clih.id,
+        cl.customer_id,
+        cl.product_key,
+        clih.`limit`,
+        clih.`available`,
+        clih.`used`,
+        clih.created_date,
+        ROW_NUMBER() OVER (PARTITION BY clih.id ORDER BY clih.history_date DESC) AS rn
+    FROM de_maya_prod.dlake_maya_products__lending.z1_loan_credit_line_user__credit_line_items_history clih
+    JOIN de_maya_prod.dlake_maya_products__lending.z1_loan_credit_line_user__credit_line_items cli
+        ON clih.id = cli.id
+    JOIN de_maya_prod.dlake_maya_products__lending.z1_loan_credit_line_user__credit_lines cl
+        ON cli.credit_line_id = cl.id
+    where cl.product_key = 'MAYA_FLEXI_V2_ENTERPRISE_LOAN'
+),
+
 lms_credit as (
     select distinct
         owner_id as customer_id,
@@ -67,12 +85,20 @@ lms_credit as (
         FROM_UTC_TIMESTAMP(created_date,'Asia/Manila') as created_date_pht
     from de_maya_prod.dlake_maya_products__lending.z1h_loan_account__loan_accounts
     where true
-    union all
+    union
     select distinct
         customer_id,
         product_key,
         FROM_UTC_TIMESTAMP(created_date,'Asia/Manila') as created_date_pht
     from de_maya_prod.dlake_maya_products__lending.z1_loan_account__credit_arrangements
+    union
+    select
+        customer_id,
+        product_key,
+        created_date
+    from credit_history
+    where 1=1
+        and rn = 1
 ),
 cpm as (
     select
@@ -126,7 +152,7 @@ final as (
 select distinct *
 from final
 where true
-    and loan_product in ('MAYA_FLEXI_ENTERPRISE_LOAN', 'MAYA_FLEXI_V2_ENTERPRISE_LOAN')
+    and loan_product in ('MAYA_FLEXI_ENTERPRISE_LOAN','MAYA_FLEXI_V2_ENTERPRISE_LOAN')
     and (
         coalesce(asset_size,sf_business_size,amanda_business_size) is null
         or coalesce(asset_size,sf_business_size,amanda_business_size) = 'LARGE'
