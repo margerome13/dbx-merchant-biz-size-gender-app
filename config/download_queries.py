@@ -79,26 +79,20 @@ credit_history as (
 ),
 
 lms_credit as (
-    select distinct
-        owner_id as customer_id,
-        product_key,
-        FROM_UTC_TIMESTAMP(created_date,'Asia/Manila') as created_date_pht
-    from de_maya_prod.dlake_maya_products__lending.z1h_loan_account__loan_accounts
-    where true
-    union
-    select distinct
-        customer_id,
-        product_key,
-        FROM_UTC_TIMESTAMP(created_date,'Asia/Manila') as created_date_pht
-    from de_maya_prod.dlake_maya_products__lending.z1_loan_account__credit_arrangements
-    union
-    select
-        customer_id,
-        product_key,
-        created_date
-    from credit_history
-    where 1=1
-        and rn = 1
+    select distinct customer_id
+    from (
+        select owner_id as customer_id, product_key
+        from de_maya_prod.dlake_maya_products__lending.z1h_loan_account__loan_accounts
+        where product_key in ('MAYA_FLEXI_ENTERPRISE_LOAN','MAYA_FLEXI_V2_ENTERPRISE_LOAN')
+        union
+        select customer_id, product_key
+        from de_maya_prod.dlake_maya_products__lending.z1_loan_account__credit_arrangements
+        where product_key in ('MAYA_FLEXI_ENTERPRISE_LOAN','MAYA_FLEXI_V2_ENTERPRISE_LOAN')
+        union
+        select customer_id, product_key
+        from credit_history
+        where rn = 1
+    )
 ),
 cpm as (
     select
@@ -120,7 +114,7 @@ final as (
         sf.DBA_Trade_Name__c as trade_name,
         sf.id as sf_id,
         mer.id as amanda_id,
-        lms.product_key as loan_product,
+        null as loan_product,
         sf.Business_Size__c as sf_business_size,
         mer.business_size as amanda_business_size,
         mdm.asset_size,
@@ -152,7 +146,6 @@ final as (
 select distinct *
 from final
 where true
-    and loan_product in ('MAYA_FLEXI_ENTERPRISE_LOAN','MAYA_FLEXI_V2_ENTERPRISE_LOAN')
     and (
         coalesce(asset_size,sf_business_size,amanda_business_size) is null
         or coalesce(asset_size,sf_business_size,amanda_business_size) = 'LARGE'
