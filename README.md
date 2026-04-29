@@ -25,6 +25,15 @@ The app implements a complete approval workflow with three statuses:
 - **Data preview** and validation before upload
 - **Metadata tracking** with upload timestamp and user
 
+### 📥 CSV On-Demand Download
+- **Execute pre-configured SQL queries** and download results as CSV
+- **On-behalf-of-user (OBO) authentication** — queries run with the logged-in user's permissions
+- **Fallback to service principal** when OBO is not available
+- **Data preview** with row/column counts before download
+- **Timestamped filenames** using Manila timezone
+- **Configurable queries** via `config/download_queries.py`
+- **Access**: Available to Admin and Maker roles
+
 ### 📊 Multi-Environment Support
 - **Dev Environment**: `dg_dev.sandbox.out_merchant_business_size_for_bank`
 - **Prod Test Environment**: `dg_prod.sandbox.out_merchant_business_size_for_bank_test`
@@ -62,6 +71,16 @@ The app implements a complete approval workflow with three statuses:
 - **Metadata Tracking**: Optional columns for upload timestamp and user
 - **Type Inference**: Automatic SQL type detection from CSV data
 - **Progress Tracking**: Real-time upload progress with status updates
+
+### CSV On-Demand Download
+- **Query Selection**: Choose from pre-configured SQL export queries
+- **On-Behalf-Of-User Auth**: Queries execute using the logged-in user's Databricks permissions via OBO token
+- **Service Principal Fallback**: Automatically falls back to app-level auth when OBO is unavailable
+- **Table Generation**: Drops and recreates the target Delta table with fresh data on each execution
+- **Data Preview**: View first 20 rows, total row count, and column count before downloading
+- **CSV Export**: Download results as a CSV file with Manila timezone timestamp in the filename
+- **Query Transparency**: View the full SQL query before execution via an expandable section
+- **Configurable**: SQL queries are managed in `config/download_queries.py` — no app code changes needed
 
 ### For Makers
 - **Submit New Review**: Select records and propose business size and gender classifications
@@ -166,6 +185,15 @@ The target table must include these columns:
 7. Click "Upload and Create/Update Table"
 8. Verify success and check backup location
 
+### CSV On-Demand Download
+1. Navigate to "CSV Download" in the sidebar (Admin and Maker roles only)
+2. Select a data export query from the dropdown
+3. Optionally review the SQL query in the expandable section
+4. Click "Execute Query & Generate Table"
+5. Wait for the query to complete (progress bar shown)
+6. Preview the results (first 20 rows displayed)
+7. Click "Download as CSV" to save the file locally
+
 ### As a Maker
 1. Select "MAKER" role from the dropdown
 2. Choose your target table
@@ -190,7 +218,8 @@ The target table must include these columns:
 ## Security & Compliance
 
 - User authentication via Databricks
-- Role-based access control (Maker/Checker)
+- On-behalf-of-user (OBO) authentication for CSV Download (queries run with user's own permissions)
+- Role-based access control (Admin/Maker/Checker)
 - Complete audit trail for all actions
 - Timestamp tracking in Manila timezone
 - SQL injection protection with parameterized queries
