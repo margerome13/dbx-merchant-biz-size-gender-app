@@ -129,6 +129,7 @@ final as (
     from lms_credit lms
     left join sfdc sf on sf.CPM_Account_ID__c = lms.customer_id
     left join amanda mer on mer.cpm_id = lms.customer_id
+        and mer.id = sf.Screening_Merchant_ID__c
     left join mambu_deposit_accts dep_accts
         on dep_accts.account_holder_key = lms.customer_id
     left join mambu_deposit_prods prods
