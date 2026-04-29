@@ -125,7 +125,13 @@ if st.button("🚀 Execute Query & Generate Table", type="primary", use_containe
             progress_bar.progress(10)
             conn = get_sp_connection(HTTP_PATH)
 
-        # Step 2: Execute CREATE TABLE query
+        # Step 2: Drop existing table to clear cached schema
+        status_text.info("🗑️ Clearing existing table...")
+        progress_bar.progress(20)
+        with conn.cursor() as cursor:
+            cursor.execute(f"DROP TABLE IF EXISTS {query_config['target_table']}")
+
+        # Step 3: Execute CREATE TABLE query
         status_text.info("⚙️ Executing query (this may take a few minutes)...")
         progress_bar.progress(30)
         with conn.cursor() as cursor:

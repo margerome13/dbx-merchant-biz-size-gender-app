@@ -9,7 +9,7 @@ DOWNLOAD_QUERIES = {
         "description": "Generates merchant business size data for bank reporting. Filters for MAYA_FLEXI_ENTERPRISE_LOAN and MAYA_FLEXI_V2_ENTERPRISE_LOAN with missing/LARGE asset size or missing gender.",
         "target_table": "dg_dev.sandbox.out_merchant_business_size_for_bank",
         "sql": """
-create or replace table dg_dev.sandbox.out_merchant_business_size_for_bank as
+create table dg_dev.sandbox.out_merchant_business_size_for_bank as
 with mambu_groups as (
     select
         *,
@@ -114,7 +114,7 @@ final as (
         sf.DBA_Trade_Name__c as trade_name,
         sf.id as sf_id,
         mer.id as amanda_id,
-        null as loan_product,
+        cast(null as string) as loan_product,
         sf.Business_Size__c as sf_business_size,
         mer.business_size as amanda_business_size,
         mdm.asset_size,
